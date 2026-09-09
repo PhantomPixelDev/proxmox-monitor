@@ -78,9 +78,21 @@ First launch puts an icon in your tray. If you don't see it, check overflow or t
 
 ## Screenshots
 
-<p align="center"><img src="docs/screenshots/dashboard.png?v=hero" width="440" alt="ProxmoxWidget on Windows — live dashboard" /></p>
+<p align="center"><img src="docs/screenshots/dashboard.png" width="440" alt="Overview tab: cluster status, VM and container counts, per-node CPU, RAM and disk bars" /></p>
 
-<p align="center"><sub>Live dashboard</sub></p>
+<p align="center"><sub>Overview — the whole cluster in one popup</sub></p>
+
+| VMs | Containers | Storage |
+| --- | --- | --- |
+| <img src="docs/screenshots/vms.png" width="250" alt="VMs tab with power and console buttons per guest" /> | <img src="docs/screenshots/containers.png" width="250" alt="LXC containers with CPU, RAM and disk usage" /> | <img src="docs/screenshots/storage.png" width="250" alt="Storage tab with usage bars" /> |
+| Start, stop, reboot, and Console, SPICE or RDP per card | Same card layout for LXC, disk usage included | Warning rail once a store passes 75% |
+
+| Search | Nodes | Settings |
+| --- | --- | --- |
+| <img src="docs/screenshots/search.png" width="250" alt="VMs tab filtered by a search term" /> | <img src="docs/screenshots/nodes.png" width="250" alt="Nodes tab with shell and web UI buttons" /> | <img src="docs/screenshots/settings.png" width="250" alt="Settings dialog with cluster form and preferences" /> |
+| Filter by name, VMID, node or status | Node metrics plus a shell shortcut | One form per cluster, secrets go to the keyring |
+
+Regenerate them with `python scripts/capture_screenshots.py --mock`.
 
 ---
 
@@ -97,7 +109,11 @@ First launch puts an icon in your tray. If you don't see it, check overflow or t
 | 🔔 | In-app banner, not popup spam | Messages use a banner inside the dashboard. The app runs with `pythonw` on Windows so there is no console |
 | 🔄 | Auto-refresh | Polls on a timer you control, default 30 seconds, plus a manual Refresh button and tray action |
 | 🖥️ | Tray goodness | Badge logic, tooltip with `online/clusters` and `running/VMs`, left-click popup, right-click menu with Open Proxmox per cluster |
-| 📊 | Tabs that make sense | Dashboard, Nodes, VMs, Containers, Storage. Each tab scrolls so it stays usable on small screens |
+| 📊 | Tabs that make sense | Overview, Nodes, VMs, LXC, Storage. Each tab scrolls so it stays usable on small screens |
+| 🔎 | Search on every list tab | Filter by name, VMID, node or status as you type, plus a Running toggle on the guest tabs and a shown/total counter |
+| 🖥️ | Console in one click | noVNC for any guest, SPICE handed to `remote-viewer` as a `.vv` file, and RDP straight to the IPv4 address the QEMU guest agent reports |
+| ⌨️ | Node shell | Opens the node's noVNC shell without hunting through the web UI |
+| 🎨 | Cards you can read | Each guest is its own card with a status-coloured rail, a header block and aligned metric rows, so rows never blur together |
 | 🌐 | One-click open | Open Proxmox button and tray Open menu jump to `https://your.host.example:8006` for the active cluster |
 | 🧱 | Storage aware | Shows type, shared or local, enabled or disabled, and a use bar with `used / total` and free space |
 
@@ -203,7 +219,11 @@ src/proxmox_widget/
   resources/app.png  # source icon, hero and screenshots
   resources/app.ico  # Windows icon, used by Nuitka
   resources/icons.py # make_app_icon, make_tray_icon
-  ui/dashboard.py    # popup dashboard, tabs, banners, progress bars
+  api/client.py      # PVE REST calls, console URLs, spiceproxy, guest agent
+  core/launcher.py   # opens noVNC, remote-viewer and the platform RDP client
+  ui/dashboard.py    # popup dashboard, tabs, search, cards, banners
+  ui/icons.py        # inline SVG icon set rendered to HiDPI pixmaps
+  ui/themes.py       # dark and light palettes plus the QSS built from them
   ui/tray.py         # tray menu, tooltip, left-click vs right-click
 ```
 
@@ -244,10 +264,11 @@ Notes:
 
 ## Roadmap
 
-- [ ] Real screenshots for the next release tag, light and dark theme
+- [x] Real screenshots, regenerated from the app by `scripts/capture_screenshots.py`
 - [ ] Per-VM sparkline for CPU over last 10 polls
 - [ ] Notifications opt in for node down and VM crash, still via in-app banner plus optional OS notify
-- [ ] Search and filter on VMs and Containers tabs
+- [x] Search and filter on every list tab
+- [ ] Light-theme screenshots alongside the dark set
 - [ ] Bulk actions for a whole node
 - [ ] Import and export clusters as JSON
 - [ ] Auto updater check against GitHub releases

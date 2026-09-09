@@ -3,191 +3,363 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ProxmoxWidget — See your Proxmox servers from the tray</title>
-<meta name="description" content="ProxmoxWidget lives in your tray — nodes, VMs and storage at a glance. No browser needed.">
-<meta name="theme-color" content="#ff7b00">
-<meta property="og:title" content="ProxmoxWidget — See your Proxmox servers from the tray">
-<meta property="og:description" content="Download → Install → Add your Proxmox → Done. Lightweight tray app for homelabs.">
+<title>ProxmoxWidget — your Proxmox servers, in the tray</title>
+<meta name="description" content="A tray app for Proxmox VE. Nodes, VMs, containers and storage at a glance, with search, power controls and one-click noVNC, SPICE and RDP consoles.">
+<meta name="theme-color" content="#e85d04">
+<meta property="og:title" content="ProxmoxWidget — your Proxmox servers, in the tray">
+<meta property="og:description" content="Nodes, VMs, containers and storage at a glance. Search every tab, start and stop guests, open noVNC, SPICE or RDP in one click.">
 <meta property="og:image" content="screenshots/dashboard.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="app.png" type="image/png">
 <style>
-:root{--o1:#ff7b00;--o2:#e85d04;--o3:#9d0208;--text:#0f0f12;--muted:#5a5a61;--subtle:#94949a;--line:#ececef;--bg:#fff;--soft:#fff7ed}
-*{box-sizing:border-box}html,body{margin:0;padding:0}
-body{font-family:"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Inter,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:20px;line-height:1.6;-webkit-font-smoothing:antialiased}
+:root{
+  --brand-1:#ff8b1f; --brand-2:#e85d04; --brand-3:#b3130a;
+  --bg:#ffffff; --bg-soft:#faf8f6; --surface:#ffffff; --line:#e8e6e3; --line-soft:#f1efec;
+  --ink:#16161a; --ink-2:#3f4048; --muted:#6b6d78; --faint:#8b8d99;
+  --shadow:0 1px 2px rgba(16,16,22,.05), 0 12px 32px rgba(16,16,22,.07);
+  --shadow-lg:0 2px 6px rgba(16,16,22,.06), 0 28px 60px rgba(16,16,22,.13);
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#101018; --bg-soft:#15151f; --surface:#191924; --line:#2b2b3a; --line-soft:#232331;
+    --ink:#f2f3f8; --ink-2:#cfd2de; --muted:#9b9eb0; --faint:#7e8193;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.45);
+    --shadow-lg:0 2px 8px rgba(0,0,0,.45), 0 30px 70px rgba(0,0,0,.55);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Inter","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+  font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
 a{color:inherit}
-.topbar{border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:10}
-.topbar-inner{max-width:1280px;margin:0 auto;padding:14px 56px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.brand{display:flex;align-items:center;gap:14px;text-decoration:none}
-.brand-icon{width:64px;height:64px;border-radius:14px;overflow:hidden;flex:0 0 64px;box-shadow:0 6px 18px rgba(232,93,4,.22);background:linear-gradient(135deg,#ff7b00,#e85d04)}
-.brand-icon img{width:64px;height:64px;display:block;object-fit:cover}
-.brand-name{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1}
-.brand-sub{font-size:13px;color:var(--muted);margin-top:3px}
-.top-links{display:flex;align-items:center;gap:12px;font-size:15px;color:var(--muted)}
-.top-links a{color:var(--muted);text-decoration:none;font-weight:600;border:1px solid var(--line);padding:8px 14px;border-radius:999px}
-.top-links a:hover{border-color:#ffb889;color:var(--text)}
-.top-links .v{font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:#0f0f12;color:#fff;padding:7px 10px;border-radius:999px}
-.shell{max-width:1280px;margin:0 auto;padding:0 56px}
-.accent-bar{height:4px;background:linear-gradient(90deg,#ff7b00 0%,#e85d04 55%,#9d0208 100%)}
-.hero{display:grid;grid-template-columns:380px 1fr;gap:40px;align-items:center;padding:60px 0}
-.hero-visual{background:linear-gradient(180deg,#fff 0%,#fff7ed 100%);border:1px solid #ffe4cc;border-radius:20px;padding:16px}
-.hero-visual img{width:380px;max-width:100%;height:auto;display:block;border-radius:14px;border:1px solid #ffedd5;box-shadow:0 12px 32px rgba(0,0,0,.10)}
-.hero-copy h1{margin:0;font-size:56px;line-height:.95;font-weight:700;letter-spacing:-.03em}
-.hero-copy .sub{margin:20px 0 0;font-size:20px;line-height:1.45;color:#1d1d1f;max-width:560px}
-.hero-copy .pitch{margin:12px 0 0;font-size:20px;line-height:1.6;color:var(--muted);max-width:560px}
-.os-note{margin-top:22px;font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--subtle);font-weight:600}
-.os-note span{color:var(--muted)}
-.downloads{margin-top:28px;display:grid;gap:14px}
-.btn{height:60px;display:flex;align-items:center;gap:14px;text-decoration:none;border-radius:14px;padding:0 20px;border:1px solid var(--line);background:#fff;transition:transform .12s,box-shadow .16s,border-color .16s}
-.btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.07);border-color:#ffd0a8}
-.btn-left{display:flex;align-items:center;gap:12px;min-width:0}
-.btn-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:0 0 36px;background:#f5f5f7;color:#1d1d1f}
-.btn-ico svg{width:20px;height:20px;display:block}
-.btn-primary{background:linear-gradient(135deg,#ff7b00 0%,#e85d04 62%,#9d0208 100%);border-color:transparent;color:#fff;box-shadow:0 14px 28px rgba(232,93,4,.28)}
-.btn-primary .btn-ico{background:rgba(255,255,255,.18);color:#fff}
-.btn strong{font-size:19px;font-weight:700;letter-spacing:-.015em;white-space:nowrap}
-.btn small{font-size:13px;opacity:.86;white-space:nowrap;font-weight:500}
-.btn-primary small{color:rgba(255,255,255,.92)}
-.btn-meta{margin-left:auto;font-size:13px;color:var(--subtle);white-space:nowrap}
-.btn-primary .btn-meta{color:rgba(255,255,255,.78)}
-.ghost{margin-top:16px;display:flex;flex-wrap:wrap;gap:12px;font-size:14px;color:var(--muted);align-items:center}
-.ghost a{color:#9d0208;text-decoration:none;font-weight:600;border-bottom:1px solid #ffd0a8;padding-bottom:1px}
-.ghost a:hover{color:#e85d04}
-.ghost-check{display:inline-flex;align-items:center;gap:6px;color:var(--subtle);font-size:13px}
-.ghost-check svg{width:16px;height:16px}
-.divider{height:1px;background:var(--line);margin:0}
-.steps-section{padding:56px 0}
-.steps-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-.steps-head h2{margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em}
-.steps-head .check{width:26px;height:26px;border-radius:999px;display:grid;place-items:center;background:#0f0f12;color:#fff;flex:0 0 26px}
-.steps-head .check svg{width:14px;height:14px}
-.steps-section .lead{margin:8px 0 0;color:var(--muted);font-size:19px}
-.steps{margin-top:32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px}
-.step{border:1px solid var(--line);border-radius:16px;padding:28px;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.03)}
-.step-num{width:36px;height:36px;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,#ff7b00,#e85d04);color:#fff;font-weight:800;font-size:16px}
-.step h3{margin:14px 0 8px;font-size:18px;font-weight:700;letter-spacing:-.01em}
-.step p{margin:0;color:var(--muted);font-size:17px;line-height:1.6}
-.footer{padding:28px 0 40px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:8px}
-.footer a{color:#9d0208;text-decoration:none;font-weight:600}
-@media(max-width:1100px){.hero{grid-template-columns:1fr;gap:40px;padding:40px 0}.hero-visual{order:2}.hero-copy{order:1}.shell{padding:0 32px}.topbar-inner{padding:14px 32px}}
-@media(max-width:640px){.hero-copy h1{font-size:40px}.hero-copy .sub{font-size:19px}.steps{grid-template-columns:1fr}.btn strong{font-size:17px}.btn small,.btn-meta{display:none}.shell{padding:0 16px}.topbar-inner{padding:12px 16px}.top-links a span{display:none}}
+img{max-width:100%;height:auto;display:block}
+svg{display:block;flex:none}
+h1,h2,h3{margin:0;letter-spacing:-.021em;line-height:1.15}
+p{margin:0}
+.shell{max-width:1120px;margin:0 auto;padding:0 24px}
+.accent{height:3px;background:linear-gradient(90deg,var(--brand-1),var(--brand-2) 55%,var(--brand-3))}
+
+/* ---------- top bar ---------- */
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line)}
+.topbar-in{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;max-width:1120px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;min-width:0}
+.brand img{width:34px;height:34px;border-radius:9px;box-shadow:0 4px 12px rgba(232,93,4,.28)}
+.brand-name{display:block;font-size:15px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.brand-tag{display:block;font-size:12px;color:var(--muted);line-height:1.3}
+.nav{display:flex;align-items:center;gap:8px}
+.nav a{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:var(--ink-2);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:7px 13px;transition:border-color .15s,color .15s,background .15s}
+.nav a:hover{border-color:var(--brand-1);color:var(--ink);background:var(--bg-soft)}
+.ver{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--brand-2);border:1px solid color-mix(in srgb,var(--brand-2) 35%,transparent);background:color-mix(in srgb,var(--brand-2) 8%,transparent);border-radius:999px;padding:5px 10px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:56px;align-items:center;padding:72px 0 64px}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-2);margin-bottom:18px}
+h1{font-size:clamp(2.2rem,4.4vw,3.35rem);font-weight:760;letter-spacing:-.033em}
+.lede{margin-top:18px;font-size:19px;line-height:1.55;color:var(--ink-2);max-width:34ch}
+.sub{margin-top:12px;font-size:16px;color:var(--muted);max-width:46ch}
+.os{margin-top:22px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--faint)}
+.os svg{opacity:.75}
+
+.downloads{margin-top:24px;display:grid;gap:10px;max-width:440px}
+.btn{display:flex;align-items:center;gap:13px;text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:13px 16px;transition:transform .13s,box-shadow .18s,border-color .18s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--brand-1) 45%,var(--line))}
+.btn-ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--bg-soft);color:var(--ink);border:1px solid var(--line-soft)}
+.btn-txt{min-width:0}
+.btn-txt b{display:block;font-size:15px;font-weight:700;letter-spacing:-.012em}
+.btn-txt span{display:block;font-size:12.5px;color:var(--muted)}
+.btn-meta{margin-left:auto;font-size:12px;font-weight:600;color:var(--faint);white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--brand-1),var(--brand-2) 62%,var(--brand-3));border-color:transparent;color:#fff;box-shadow:0 10px 26px rgba(232,93,4,.32)}
+.btn-primary:hover{box-shadow:0 14px 34px rgba(232,93,4,.4);border-color:transparent}
+.btn-primary .btn-ico{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.2);color:#fff}
+.btn-primary .btn-txt span,.btn-primary .btn-meta{color:rgba(255,255,255,.86)}
+
+.finelinks{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:13.5px;color:var(--muted)}
+.finelinks a{color:var(--brand-2);text-decoration:none;font-weight:600;border-bottom:1px solid color-mix(in srgb,var(--brand-2) 30%,transparent);padding-bottom:1px}
+.finelinks a:hover{border-bottom-color:var(--brand-2)}
+.finelinks .sep{color:var(--line)}
+.verified{display:inline-flex;align-items:center;gap:6px;color:var(--faint);font-size:12.5px}
+
+.shot{background:linear-gradient(170deg,var(--bg-soft),var(--surface));border:1px solid var(--line);border-radius:22px;padding:14px;box-shadow:var(--shadow-lg)}
+.shot img{border-radius:12px;border:1px solid var(--line-soft)}
+.shot figcaption{margin-top:10px;text-align:center;font-size:12.5px;color:var(--faint)}
+
+/* ---------- sections ---------- */
+section{padding:64px 0;border-top:1px solid var(--line)}
+.head{max-width:60ch}
+.head h2{font-size:clamp(1.5rem,2.6vw,2rem);font-weight:720}
+.head p{margin-top:10px;color:var(--muted);font-size:16.5px}
+
+.features{margin-top:36px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.feature{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.feature .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand-2) 10%,transparent);color:var(--brand-2);margin-bottom:14px}
+.feature h3{font-size:16px;font-weight:700}
+.feature p{margin-top:7px;color:var(--muted);font-size:14.5px;line-height:1.58}
+
+/* masonry columns keep every shot at its own height without a ragged grid */
+.gallery{margin-top:36px;column-count:3;column-gap:18px}
+figure{margin:0}
+.gallery figure{break-inside:avoid;margin-bottom:18px;background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+.gallery img{border-radius:9px;border:1px solid var(--line-soft);background:var(--surface)}
+.gallery figcaption{margin-top:9px;font-size:12.5px;color:var(--muted);text-align:center}
+
+.steps{margin-top:36px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;counter-reset:step}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.step .n{width:30px;height:30px;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#fff;font-size:14px;font-weight:800}
+.step h3{margin-top:13px;font-size:16px;font-weight:700}
+.step p{margin-top:6px;color:var(--muted);font-size:14.5px}
+code{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--bg-soft);border:1px solid var(--line-soft);border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+
+footer{border-top:1px solid var(--line);padding:28px 0 44px;color:var(--muted);font-size:13.5px}
+.foot-in{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+footer a{color:var(--brand-2);text-decoration:none;font-weight:600}
+
+@media(max-width:980px){
+  .hero{grid-template-columns:1fr;gap:40px;padding:52px 0 48px}
+  .shot{order:2;max-width:420px;margin:0 auto}
+  .features,.steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gallery{column-count:2}
+}
+@media(max-width:620px){
+  body{font-size:15.5px}
+  .shell,.topbar-in{padding-left:18px;padding-right:18px}
+  .features,.steps{grid-template-columns:1fr}
+  .gallery{column-count:1}
+  .brand-tag,.nav a[href="#screenshots"]{display:none}
+  section{padding:48px 0}
+  .lede{font-size:17.5px}
+}
 </style>
 </head>
 <body>
-<div class="accent-bar" aria-hidden="true"></div>
+<div class="accent" aria-hidden="true"></div>
+
 <header class="topbar">
-  <div class="topbar-inner">
-    <a class="brand" href="#">
-      <span class="brand-icon" aria-hidden="true"><img src="app.png" width="64" height="64" alt="ProxmoxWidget icon"></span>
+  <div class="topbar-in">
+    <a class="brand" href="#top">
+      <img src="app.png" width="34" height="34" alt="">
       <span>
-        <div class="brand-name">ProxmoxWidget</div>
-        <div class="brand-sub">Tray dashboard for Proxmox VE</div>
+        <span class="brand-name">ProxmoxWidget</span>
+        <span class="brand-tag">Tray dashboard for Proxmox VE</span>
       </span>
     </a>
-    <nav class="top-links" aria-label="Links">
-      <span class="v">v0.1.11</span>
-      <a href="https://github.com/PhantomPixelDev/proxmox-monitor">GitHub</a>
-      <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest"><span>Releases</span> Releases</a>
+    <nav class="nav" aria-label="Project links">
+      <span class="ver" id="version">v0.1.11</span>
+      <a href="#screenshots"><span class="label">Screenshots</span></a>
+      <a href="https://github.com/PhantomPixelDev/proxmox-monitor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.6 5.6.6 11.9c0 5 3.3 9.3 7.8 10.8.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6a11.4 11.4 0 0 0 7.8-10.8C23.4 5.6 18.3.5 12 .5Z"/></svg>
+        <span class="label">GitHub</span>
+      </a>
     </nav>
   </div>
 </header>
-<main class="shell">
-  <section class="hero" aria-label="Hero">
-    <div class="hero-visual">
-      <img src="screenshots/dashboard.png" width="380" height="938" alt="ProxmoxWidget dashboard showing live nodes, VMs and storage" loading="eager" decoding="async">
-    </div>
-    <div class="hero-copy">
-      <h1>See your Proxmox servers from the tray.</h1>
-      <p class="sub">Live nodes, VMs &amp; storage at a glance — no browser tab needed.</p>
-      <p class="pitch">Lightweight. Click the tray icon and your homelab appears. Token auth, auto-refresh.</p>
-      <div class="os-note" aria-label="Supported systems"><span>Windows</span> &middot; Linux &middot; macOS</div>
-      <div class="downloads" role="list">
-        <a class="btn btn-primary" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Windows-x64-Setup.exe">
-          <span class="btn-left">
-            <span class="btn-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.2"/><rect x="13" y="3" width="8" height="8" rx="1.2"/><rect x="3" y="13" width="8" height="8" rx="1.2"/><rect x="13" y="13" width="8" height="8" rx="1.2"/></svg>
-            </span>
-            <span><strong>Download for Windows</strong><br><small>Setup.exe &middot; Windows 10/11</small></span>
-          </span>
+
+<main id="top">
+<div class="shell">
+  <section class="hero" style="border-top:none">
+    <div>
+      <div class="eyebrow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="7" rx="2"/><rect x="2.5" y="13" width="19" height="7" rx="2"/><path d="M6.5 7.5h.01M6.5 16.5h.01"/></svg>
+        Free · Open source · MIT
+      </div>
+      <h1>Your Proxmox servers, in the tray.</h1>
+      <p class="lede">Nodes, VMs, containers and storage at a glance — no browser tab, no dashboard to keep open.</p>
+      <p class="sub">Search every tab, start and stop guests, and jump straight into a noVNC, SPICE or RDP session. API-token auth, auto-refresh, nothing phones home.</p>
+
+      <div class="os" aria-label="Supported systems">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6.1 10.6 5v6.4H3zm8.9-1.24L21 3.6v7.85h-9.1zM3 12.75h7.6v6.4L3 18.1zm8.9 0H21v7.85l-9.1-1.26z"/></svg>
+        Windows 10/11
+        <span aria-hidden="true">·</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12 2.2c2 0 3.5 1.7 3.5 3.9 0 .7.1 1.3.3 1.8.5 1.2 1.7 2.3 2.3 3.6.5 1 .6 2 .2 2.6-.3.5-1 .6-1.6.3.2 1 .5 1.9 1 2.7.6 1 0 2.1-1.1 2.4-1.2.3-2.9.5-4.6.5s-3.4-.2-4.6-.5c-1.1-.3-1.7-1.4-1.1-2.4.5-.8.8-1.7 1-2.7-.6.3-1.3.2-1.6-.3-.4-.6-.3-1.6.2-2.6c.6-1.3 1.8-2.4 2.3-3.6.2-.5.3-1.1.3-1.8 0-2.2 1.5-3.9 3.5-3.9ZM10.5 5.5a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 0 0 0-2.1ZM13.5 5.5a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 0 0 0-2.1ZM12 8.1c-.95 0-1.7.55-2 1.3.6.55 1.3.8 2 .8s1.4-.25 2-.8c-.3-.75-1.05-1.3-2-1.3Z"/></svg>
+        Linux
+        <span aria-hidden="true">·</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.05 12.68c.02-2.06 1.68-3.05 1.76-3.1-.96-1.4-2.45-1.6-2.98-1.62-1.27-.13-2.48.75-3.12.75-.64 0-1.63-.73-2.68-.71-1.38.02-2.65.8-3.36 2.03-1.43 2.49-.37 6.17 1.03 8.19.68.99 1.5 2.1 2.57 2.06 1.03-.04 1.42-.67 2.67-.67s1.6.67 2.69.65c1.11-.02 1.81-1 2.49-1.99.78-1.14 1.1-2.25 1.12-2.3-.02-.01-2.15-.83-2.19-3.29zM14.16 6.6c.57-.69.95-1.65.85-2.6-.82.03-1.81.54-2.4 1.23-.53.61-.99 1.59-.87 2.53.91.07 1.85-.46 2.42-1.16z"/></svg>
+        macOS
+      </div>
+
+      <div class="downloads">
+        <a class="btn btn-primary" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Windows-x64-Setup.exe">
+          <span class="btn-ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.1 10.6 5v6.4H3zm8.9-1.24L21 3.6v7.85h-9.1zM3 12.75h7.6v6.4L3 18.1zm8.9 0H21v7.85l-9.1-1.26z"/></svg></span>
+          <span class="btn-txt"><b>Download for Windows</b><span>Setup.exe · installs in seconds</span></span>
           <span class="btn-meta">64-bit</span>
         </a>
-        <a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Windows-x64-Portable.zip">
-          <span class="btn-left">
-            <span class="btn-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="M7 10l5 5 5-5"/><path d="M3 17v2a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-2"/></svg>
-            </span>
-            <span><strong>Portable ZIP</strong><br><small>No install — unzip &amp; run</small></span>
-          </span>
-          <span class="btn-meta">Zip</span>
+        <a class="btn" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Windows-x64-Portable.zip">
+          <span class="btn-ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 16.5v2.5a1.5 1.5 0 0 0 1.5 1.5h13a1.5 1.5 0 0 0 1.5-1.5v-2.5"/></svg></span>
+          <span class="btn-txt"><b>Portable ZIP</b><span>No install — unzip and run</span></span>
+          <span class="btn-meta">Windows</span>
         </a>
-        <a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Linux-x64.tar.gz">
-          <span class="btn-left">
-            <span class="btn-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5c-1.1 0-2 .7-2.4 1.7-.6.2-1 .7-1 1.3 0 .3.1.6.3.8-.5.4-.8 1-.8 1.7 0 .6.2 1.1.6 1.5-.4.3-.6.7-.6 1.2 0 .6.4 1.1.9 1.3-.1.3-.2.6-.2 1 0 .9.5 1.7 1.2 2.1.4.7 1.1 1.2 2 1.2s1.6-.5 2-1.2c.7-.4 1.2-1.2 1.2-2.1 0-.4 0-.7-.2-1 .5-.2.9-.7.9-1.3 0-.5-.2-.9-.6-1.2.4-.4.6-.9.6-1.5 0-.7-.3-1.3-.8-1.7.2-.2.3-.5.3-.8 0-.6-.4-1.1-1-1.3C14 5.2 13.1 4.5 12 4.5Z"/><path d="M9.5 13.5s.7 1 2.5 1 2.5-1 2.5-1"/><path d="M10 9.5h.01"/><path d="M14 9.5h.01"/></svg>
-            </span>
-            <span><strong>Download for Linux</strong><br><small>tar.gz &middot; x64</small></span>
-          </span>
+        <a class="btn" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-Linux-x64.tar.gz">
+          <span class="btn-ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 2.2c2 0 3.5 1.7 3.5 3.9 0 .7.1 1.3.3 1.8.5 1.2 1.7 2.3 2.3 3.6.5 1 .6 2 .2 2.6-.3.5-1 .6-1.6.3.2 1 .5 1.9 1 2.7.6 1 0 2.1-1.1 2.4-1.2.3-2.9.5-4.6.5s-3.4-.2-4.6-.5c-1.1-.3-1.7-1.4-1.1-2.4.5-.8.8-1.7 1-2.7-.6.3-1.3.2-1.6-.3-.4-.6-.3-1.6.2-2.6c.6-1.3 1.8-2.4 2.3-3.6.2-.5.3-1.1.3-1.8 0-2.2 1.5-3.9 3.5-3.9ZM10.5 5.5a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 0 0 0-2.1ZM13.5 5.5a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 0 0 0-2.1ZM12 8.1c-.95 0-1.7.55-2 1.3.6.55 1.3.8 2 .8s1.4-.25 2-.8c-.3-.75-1.05-1.3-2-1.3Z"/></svg></span>
+          <span class="btn-txt"><b>Download for Linux</b><span>tar.gz · x86-64</span></span>
           <span class="btn-meta">x64</span>
         </a>
-        <a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-macOS-x64.dmg">
-          <span class="btn-left">
-            <span class="btn-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19c-1.2 0-2-.4-2.6-1-1.1-1-1.7-2.5-1.7-4.2 0-1.7.6-3 1.7-4 .4-.4.9-.6 1.4-.6.4 0 .7.1 1 .3.3-.2.6-.3 1-.3.5 0 1 .2 1.4.6 1.1 1 1.7 2.3 1.7 4 0 1.7-.6 3.2-1.7 4.2-.6.6-1.4 1-2.6 1Z"/><path d="M12 6c0-.7.3-1.4.9-1.9.1.5 0 1-.4 1.5-.4.5-.9.7-1.4.8-.1 0-.1 0-.1 0 .3-.2.7-.3 1-.4Z"/></svg>
-            </span>
-            <span><strong>Download for macOS</strong><br><small>dmg &middot; x64</small></span>
-          </span>
+        <a class="btn" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/ProxmoxWidget-0.1.11-macOS-x64.dmg">
+          <span class="btn-ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.05 12.68c.02-2.06 1.68-3.05 1.76-3.1-.96-1.4-2.45-1.6-2.98-1.62-1.27-.13-2.48.75-3.12.75-.64 0-1.63-.73-2.68-.71-1.38.02-2.65.8-3.36 2.03-1.43 2.49-.37 6.17 1.03 8.19.68.99 1.5 2.1 2.57 2.06 1.03-.04 1.42-.67 2.67-.67s1.6.67 2.69.65c1.11-.02 1.81-1 2.49-1.99.78-1.14 1.1-2.25 1.12-2.3-.02-.01-2.15-.83-2.19-3.29zM14.16 6.6c.57-.69.95-1.65.85-2.6-.82.03-1.81.54-2.4 1.23-.53.61-.99 1.59-.87 2.53.91.07 1.85-.46 2.42-1.16z"/></svg></span>
+          <span class="btn-txt"><b>Download for macOS</b><span>dmg · Intel and Rosetta</span></span>
           <span class="btn-meta">x64</span>
         </a>
       </div>
-      <div class="ghost">
+
+      <div class="finelinks">
         <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">Latest release</a>
-        <span aria-hidden="true">·</span>
-        <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/SHA256SUMS.txt">SHA256</a>
-        <span aria-hidden="true">·</span>
+        <span class="sep" aria-hidden="true">|</span>
+        <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.11/SHA256SUMS.txt">SHA256SUMS</a>
+        <span class="sep" aria-hidden="true">|</span>
         <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases">All releases</a>
-        <span class="ghost-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg> Verified builds</span>
+        <span class="verified">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7 20 6v6c0 5-3.4 8.3-8 9.3C7.4 20.3 4 17 4 12V6Z"/><path d="m9 12 2 2 4-4"/></svg>
+          Built and published by GitHub Actions
+        </span>
+      </div>
+    </div>
+
+    <figure class="shot">
+      <img src="screenshots/dashboard.png" width="468" height="620" alt="ProxmoxWidget overview tab showing a cluster with two nodes, VM and container counts, and CPU, RAM and disk usage bars" loading="eager" decoding="async">
+      <figcaption>The whole cluster in one popup, 468&nbsp;px wide.</figcaption>
+    </figure>
+  </section>
+
+  <section id="features">
+    <div class="head">
+      <h2>Everything the web UI makes you click through</h2>
+      <p>One popup off the tray icon, refreshed on a timer you choose.</p>
+    </div>
+    <div class="features">
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="7" rx="2"/><rect x="2.5" y="13" width="19" height="7" rx="2"/><path d="M6.5 7.5h.01M6.5 16.5h.01"/><path d="M10 7.5h5M10 16.5h5"/></svg></div>
+        <h3>Live nodes and guests</h3>
+        <p>CPU, memory and disk for every node, VM and LXC container, with uptime and vCPU counts on the same line.</p>
+      </article>
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.7-4.7"/></svg></div>
+        <h3>Search on every tab</h3>
+        <p>Filter by name, VMID, node or status. A Running toggle hides everything that is powered off.</p>
+      </article>
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9.5 3 2.5-3 2.5"/><path d="M12.5 15H17"/></svg></div>
+        <h3>Console in one click</h3>
+        <p>noVNC for any guest, SPICE handed to remote-viewer, and RDP straight to the address the guest agent reports.</p>
+      </article>
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5v13l11-6.5Z"/></svg></div>
+        <h3>Start, stop, reboot</h3>
+        <p>Power actions run against the API and the card shows a progress bar until the guest reaches the state you asked for.</p>
+      </article>
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7 20 6v6c0 5-3.4 8.3-8 9.3C7.4 20.3 4 17 4 12V6Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3>API tokens, kept local</h3>
+        <p>Secrets live in your OS keyring, never in a config file. A read-only token is enough for monitoring.</p>
+      </article>
+      <article class="feature">
+        <div class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.5 7v10L12 21.2 3.5 17V7Z"/><path d="M3.5 7 12 11.4 20.5 7"/><path d="M12 11.4V21.2"/></svg></div>
+        <h3>Multi-cluster</h3>
+        <p>Add as many endpoints as you run. Everything merges into one list, and the tray icon flags a cluster that drops offline.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="screenshots">
+    <div class="head">
+      <h2>What it looks like</h2>
+      <p>Real captures from the app, not mockups.</p>
+    </div>
+    <div class="gallery">
+      <figure>
+        <img src="screenshots/vms.png" width="468" height="880" alt="VMs tab listing guests as separate cards with status pills, usage bars and power and console buttons" loading="lazy" decoding="async">
+        <figcaption>VMs — power and console per card</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/containers.png" width="468" height="861" alt="Containers tab showing LXC containers with CPU, memory and disk usage" loading="lazy" decoding="async">
+        <figcaption>LXC containers</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/search.png" width="468" height="620" alt="VMs tab filtered by the search term win, showing one matching guest" loading="lazy" decoding="async">
+        <figcaption>Search filters as you type</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/storage.png" width="468" height="626" alt="Storage tab showing local, local-lvm and an NFS backup share with usage bars" loading="lazy" decoding="async">
+        <figcaption>Storage, with a warning rail when it fills</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/nodes.png" width="468" height="620" alt="Nodes tab showing a node with usage bars and shell and web UI buttons" loading="lazy" decoding="async">
+        <figcaption>Nodes — shell and web UI</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/settings.png" width="540" height="836" alt="Settings dialog with cluster list, host, port, auth mode, token fields and preferences" loading="lazy" decoding="async">
+        <figcaption>Settings — one form per cluster</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="head">
+      <h2>Running in about a minute</h2>
+      <p>No agent on the server, no database, no container to deploy.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h3>Install</h3>
+        <p>Run the Setup.exe, or unzip the portable build anywhere. The app starts in the tray.</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3>Add your cluster</h3>
+        <p>Tray, then Settings, then Add. Host, port <code>8006</code>, and an API token ID plus secret.</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3>Click the tray icon</h3>
+        <p>Nodes, guests and storage appear and refresh on their own. Open Proxmox jumps to the web UI.</p>
       </div>
     </div>
   </section>
-  <div class="divider" aria-hidden="true"></div>
-  <section class="steps-section" aria-label="How it works">
-    <div class="steps-head">
-      <h2>Download → Install → Done</h2>
-      <span class="check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-    </div>
-    <p class="lead">Three steps and your homelab is in the tray.</p>
-    <div class="steps">
-      <div class="step"><div class="step-num">1</div><h3>Download</h3><p>Grab the Setup.exe or Portable ZIP above.</p></div>
-      <div class="step"><div class="step-num">2</div><h3>Add Proxmox</h3><p>Tray → Settings → Add Cluster. Host, port 8006 and API token.</p></div>
-      <div class="step"><div class="step-num">3</div><h3>Done</h3><p>Nodes, VMs and storage appear live. Open Proxmox jumps to the web UI.</p></div>
-    </div>
-  </section>
-  <footer class="footer">
+</div>
+</main>
+
+<footer>
+  <div class="shell foot-in">
     <span>© 2026 PhantomPixelDev · <a href="https://github.com/PhantomPixelDev/proxmox-monitor">GitHub</a> · MIT · Not affiliated with Proxmox Server Solutions GmbH</span>
     <span><a href="https://github.com/PhantomPixelDev/proxmox-monitor/blob/master/README.md">Docs</a> · Hosted on GitHub Pages</span>
-  </footer>
-</main>
+  </div>
+</footer>
+
 <script>
 (function(){
   var API="https://api.github.com/repos/PhantomPixelDev/proxmox-monitor/releases/latest";
   var LATEST_BASE="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest/download/";
-  fetch(API,{headers:{"Accept":"application/vnd.github+json"}}).then(function(r){if(!r.ok) throw new Error(r.status);return r.json();}).then(function(data){
-    var assets=data.assets||[];
-    function findAsset(pattern){for(var i=0;i<assets.length;i++){if(assets[i].name&&assets[i].name.indexOf(pattern)!==-1) return assets[i];}return null;}
-    var map=[
-      {pattern:"Windows-x64-Setup.exe",selector:'a[href*="Windows-x64-Setup.exe"]'},
-      {pattern:"Portable.zip",selector:'a[href*="Portable.zip"]'},
-      {pattern:"Linux-x64.tar.gz",selector:'a[href*="Linux-x64.tar.gz"]'},
-      {pattern:"macOS-x64.dmg",selector:'a[href*="macOS-x64.dmg"]'},
-      {pattern:"SHA256SUMS.txt",selector:'a[href*="SHA256SUMS.txt"]'},
-      {pattern:"macOS-x64.tar.gz",selector:'a[href*="macOS-x64.tar.gz"]'}
-    ];
-    map.forEach(function(entry){
-      var asset=findAsset(entry.pattern);
-      if(!asset) return;
-      var href=asset.browser_download_url||LATEST_BASE+asset.name;
-      document.querySelectorAll(entry.selector).forEach(function(a){a.href=href;});
-    });
-  }).catch(function(){});
+  fetch(API,{headers:{"Accept":"application/vnd.github+json"}})
+    .then(function(r){if(!r.ok) throw new Error(r.status);return r.json();})
+    .then(function(data){
+      var assets=data.assets||[];
+      function findAsset(pattern){
+        for(var i=0;i<assets.length;i++){
+          if(assets[i].name&&assets[i].name.indexOf(pattern)!==-1) return assets[i];
+        }
+        return null;
+      }
+      [
+        {pattern:"Windows-x64-Setup.exe",selector:'a[href*="Windows-x64-Setup.exe"]'},
+        {pattern:"Portable.zip",selector:'a[href*="Portable.zip"]'},
+        {pattern:"Linux-x64.tar.gz",selector:'a[href*="Linux-x64.tar.gz"]'},
+        {pattern:"macOS-x64.dmg",selector:'a[href*="macOS-x64.dmg"]'},
+        {pattern:"SHA256SUMS.txt",selector:'a[href*="SHA256SUMS.txt"]'}
+      ].forEach(function(entry){
+        var asset=findAsset(entry.pattern);
+        if(!asset) return;
+        var href=asset.browser_download_url||LATEST_BASE+asset.name;
+        document.querySelectorAll(entry.selector).forEach(function(a){a.href=href;});
+      });
+      if(data.tag_name){
+        var v=document.getElementById("version");
+        if(v) v.textContent=data.tag_name;
+      }
+    })
+    .catch(function(){});
 })();
 </script>
 </body>
