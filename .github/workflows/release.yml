@@ -79,6 +79,7 @@ jobs:
             --standalone \
             --onefile \
             --enable-plugin=pyside6 \
+            --assume-yes-for-downloads \
             --include-data-dir=src/proxmox_widget/resources=resources \
             --include-package=proxmox_widget \
             ${EXTRA} \

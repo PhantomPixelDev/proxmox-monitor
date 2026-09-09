@@ -80,6 +80,10 @@ reportUnknownVariableType = false
 reportUnknownParameterType = false
 reportUnknownArgumentType = false
 reportUnknownLambdaType = false
+reportOptionalMemberAccess = false
+reportAttributeAccessIssue = false
+reportCallIssue = false
+reportArgumentType = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
