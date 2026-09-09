@@ -1,75 +1,303 @@
-# 🖥️ ProxmoxWidget
+<p align="center">
+  <img src="src/proxmox_widget/resources/app.png" width="96" alt="ProxmoxWidget app icon, orange server stack" />
+</p>
 
-Lightweight cross-platform system-tray / menu-bar client for Proxmox VE.
+<h1 align="center">ProxmoxWidget — Proxmox VE Desktop Client (Tray)</h1>
 
-> Run it on Windows, Linux, or macOS — click the tray icon and get a live dashboard of your PVE infrastructure.
+<p align="center">
+  Live infrastructure at a glance. A lightweight tray app for Proxmox VE that shows nodes, VMs, LXC, and storage without opening the browser.
+</p>
 
-```
-┌──────────────────────────────┐
-│ 🖥 ProxmoxWidget              │
-├──────────────────────────────┤
-│ 🟢 pve-01                    │
-│    CPU   ███░░░░  38%        │
-│    RAM   █████░░  62%        │
-│    Uptime 14d 7h             │
-│                              │
-│ VMs                           │
-│ 🟢 web-server       42% CPU  │
-│ 🔴 minecraft        STOPPED  │
-│                              │
-│ Containers                    │
-│ 🟢 nginx             RUNNING │
-│                              │
-│ [ Open Proxmox ]   [ ⚙ ]     │
-└──────────────────────────────┘
-```
+<p align="center">
+  <a href="https://github.com/proxmox-widget/proxmox-widget/releases"><img src="https://img.shields.io/github/v/release/proxmox-widget/proxmox-widget?label=release&color=2ecc71" alt="GitHub release" /></a>
+  <a href="https://github.com/proxmox-widget/proxmox-widget/actions"><img src="https://img.shields.io/github/actions/workflow/status/proxmox-widget/proxmox-widget/ci.yml?branch=main&label=build" alt="Build status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/proxmox-widget/proxmox-widget?color=89b4fa" alt="MIT license" /></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11 plus" /></a>
+  <a href="https://pypi.org/project/proxmox-widget/"><img src="https://img.shields.io/pypi/dm/proxmox-widget?label=downloads&color=e85d04" alt="PyPI downloads" /></a>
+  <a href="https://github.com/proxmox-widget/proxmox-widget"><img src="https://img.shields.io/badge/PySide6-Qt6-41CD52?logo=qt&logoColor=white" alt="PySide6 Qt6" /></a>
+</p>
+
+<p align="center">
+  <a href="#screenshots">Screenshots</a> •
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#api-token-least-privilege">API Token</a> •
+  <a href="#security">Security</a> •
+  <a href="#troubleshooting">Troubleshooting</a> •
+  <a href="#dev">Dev</a> •
+  <a href="#packaging">Packaging</a> •
+  <a href="#roadmap">Roadmap</a> •
+  <a href="#faq">FAQ</a>
+</p>
+
+> Works on Windows, Linux, and macOS. Click the tray icon, get a live dashboard for every cluster you manage. No browser tab clutter, no polling your phone.
+
+---
+
+## Screenshots
+
+Placeholders now, real captures on the next release. Each image lives in `docs/screenshots/` so you can swap them without touching the README.
+
+| Dashboard | Nodes | VMs |
+| --- | --- | --- |
+| [![ProxmoxWidget dashboard — CPU/RAM bars for pve](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png)<br><sub>Dashboard: cluster health, per-node CPU/RAM/Disk bars, online counts</sub> | [![ProxmoxWidget nodes — per-node uptime and resource bars](docs/screenshots/nodes.png)](docs/screenshots/nodes.png)<br><sub>Nodes: status, uptime, per-node bars for CPU, RAM, Disk</sub> | [![ProxmoxWidget VMs — VM list with start stop reboot](docs/screenshots/vms.png)](docs/screenshots/vms.png)<br><sub>VMs: name, vCPU, RAM, status badge, Start/Stop/Reboot</sub> |
+
+| Containers | Storage | Settings |
+| --- | --- | --- |
+| [![ProxmoxWidget containers — LXC status and actions](docs/screenshots/containers.png)](docs/screenshots/containers.png)<br><sub>Containers: LXC status, resource bars when running</sub> | [![ProxmoxWidget storage — disk usage bars and free space](docs/screenshots/storage.png)](docs/screenshots/storage.png)<br><sub>Storage: usage bar, used and total, free space, shared or local</sub> | [![ProxmoxWidget settings — Add Cluster and API token flow](docs/screenshots/settings.png)](docs/screenshots/settings.png)<br><sub>Settings: Add Cluster with host, port, and API token</sub> |
+
+| Tray |
+| --- |
+| [![ProxmoxWidget system tray — menu and tooltip](docs/screenshots/tray.png)](docs/screenshots/tray.png)<br><sub>Tray: left-click popup dashboard, right-click menu, hover tooltip with live counts</sub> |
+
+See [docs/screenshots/README.md](docs/screenshots/README.md) for capture notes and how to replace placeholders.
 
 ## Features
 
-- **Multiple clusters & nodes** — manage many `host:port` endpoints
-- **Live dashboard** — CPU/RAM/storage, uptime, VM/LXC status
-- **Actions** — start / stop / restart / open console
-- **Health & Alerts** — node/VM down notifications, offline mode
-- **Auto-refresh** — configurable interval (default 30s)
-- **Tray goodness** — badge, tooltip, left-click popup, right-click menu
-- **Secure auth** — API-token (`PVEAPIToken=...`), secrets in OS keyring
-- **Themes** — dark / light / system, QSS based
-- **Cross-platform** — Windows `.exe`, Linux AppImage/`.deb`, macOS `.app`
+| Icon | Feature | What you get |
+| --- | --- | --- |
+| 🏢 | Multi-cluster | Add many `host:port` endpoints, switch between them, totals roll up in the header |
+| 🔐 | Least-privilege API tokens | Uses `PVEAPIToken=...`, never your root password. Works with `PVEAuditor` plus `VM.Audit` and optional `VM.PowerMgmt` |
+| ⏳ | Live wait state | Start, Stop, Reboot show a busy badge and indeterminate bar, polling waits until the guest reaches the wanted state |
+| 🔴 | Offline badge | Clusters that fail to respond show OFFLINE with the error, no spinner forever. Nodes that are offline get a red dot |
+| 🌓 | Dark, Light, System | QSS themes that follow your OS. No restart needed |
+| 🔑 | OS keyring | Tokens go to the system keyring, not a plain file. Config stays in `platformdirs` |
+| 🔔 | In-app banner, not popup spam | Messages use a banner inside the dashboard. The app runs with `pythonw` on Windows so there is no console |
+| 🔄 | Auto-refresh | Polls on a timer you control, default 30 seconds, plus a manual Refresh button and tray action |
+| 🖥️ | Tray goodness | Badge logic, tooltip with `online/clusters` and `running/VMs`, left-click popup, right-click menu with Open Proxmox per cluster |
+| 📊 | Tabs that make sense | Dashboard, Nodes, VMs, Containers, Storage. Each tab is a scroll area so it stays usable on small screens |
+| 🌐 | One-click open | Open Proxmox button and tray Open menu jump to `https://your.host.example:8006` for the active cluster |
+| 🧱 | Storage aware | Shows type, shared or local, enabled or disabled, and a use bar with `used / total` and free space |
 
 ## Quick Start
 
+### Install
+
 ```bash
-# with uv (recommended)
+# isolated, recommended
+pipx install proxmox-widget
+
+# or with pip
+pip install proxmox-widget
+
+# from source with uv
 uv venv && uv pip install -e ".[dev]"
 uv run proxmox-widget
 
-# or pip
+# from source with pip
 pip install -e ".[dev]"
 proxmox-widget
 ```
 
-On first launch: **⚙ Settings → Add Cluster** → `https://pve.example.com:8006` → API Token → Save.
+### Run
 
-### Creating an API Token in Proxmox
+```bash
+# normal, no console on Windows
+pythonw -m proxmox_widget
 
-Datacenter → Access → API Tokens → Add → `widget@pve!monitor` → uncheck *Privilege Separation* → copy token.
+# console for logs, useful when you debug
+python -m proxmox_widget --dev
+# or
+proxmox-widget --dev
+```
 
-Give it at least `PVEAuditor` + `VM.Audit` on `/` and `VM.PowerMgmt` if you want start/stop.
+The window is frameless and pops near the tray. If you do not see it, check the tray overflow on Windows or the menu bar on macOS.
+
+### First cluster
+
+1. Launch the app, click the gear icon or right-click tray and pick Settings.
+2. Choose Add Cluster.
+3. Enter host like `your.host.example`, port `8006` (default for Proxmox VE), and paste the API token.
+4. Save. The dashboard polls right away and the footer shows `online/clusters, nodes, VMs, containers`.
+
+> Example only. Replace `your.host.example` with your real host. Do not use a hard-coded private IP as a template.
+
+### Updating
+
+```bash
+pipx upgrade proxmox-widget
+# or
+pip install -U proxmox-widget
+```
+
+## API Token, Least Privilege
+
+You do not need a full admin user. Create a token that can read and, if you want, power manage.
+
+### In Proxmox VE
+
+1. Datacenter, Access, API Tokens, Add.
+2. User `widget@pve`, token ID `monitor`, so the full ID is `widget@pve!monitor`.
+3. Uncheck Privilege Separation if you want the token to inherit the user permissions directly. Leave it checked if you plan to set permissions on the token itself.
+4. Copy the secret once. It looks like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
+
+### Permissions
+
+Go to Datacenter, Permissions, Add, and give the user or token at least:
+
+- `PVEAuditor` on `/` for cluster and node read
+- `VM.Audit` on `/` for VM and LXC read
+- `VM.PowerMgmt` on `/` or on the specific pools you want to control if you want Start, Stop, Reboot from the widget
+
+If you skip `VM.PowerMgmt`, the widget still works in read only mode. Buttons will return a 403 and you will see a banner error.
+
+### Why least privilege matters
+
+Tokens are long lived. If a laptop is lost or a token leaks in a screenshot, a narrow token limits harm. OS keyring storage helps, but a small scope is your real safety net.
+
+### Format in the app
+
+Paste as:
+
+```
+PVEAPIToken=widget@pve!monitor=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+The app builds the `Authorization` header for you and never logs the secret.
+
+## Security
+
+- No password auth. Only API tokens.
+- Tokens go to the OS keyring via `keyring`. On Windows that is Credential Manager, on macOS Keychain, on Linux Secret Service or KWallet.
+- Config with non-secret fields lives in the platform config dir via `platformdirs`. Check it with `python -m proxmox_widget --help` or look in `%APPDATA%/proxmox-widget` on Windows.
+- TLS verify is on by default for `httpx`. If you use self signed certs on your homelab, set verify per cluster in Settings. Prefer adding your CA to the system store instead of turning verify off.
+- No console on Windows unless you pass `--dev`. Logs go to the log file in the platform log dir, not to stdout.
+- Notifications are an in-app banner, not OS popups that might leak names on a shared screen.
+- If you share a screenshot, blur the token and the host.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `OFFLINE` badge right after Add Cluster | Host, port, or token wrong. Or host unreachable | Check the banner error. Confirm `https://your.host.example:8006` loads in a browser. Re paste the token without extra spaces |
+| `500` on refresh, then recovers | Proxmox API hiccup or node restart | The widget retries on next poll. If it stays, check `pveproxy` logs on the node with `journalctl -u pveproxy` |
+| `Connection reset` or `ConnectError` | Network blip, firewall, or TLS intercept | Try `curl -vk https://your.host.example:8006/api2/json/version -H "Authorization: PVEAPIToken=..."`. Check VPN and corporate proxy |
+| `403 Forbidden` on Start or Stop | Token lacks `VM.PowerMgmt` | Add that privilege on `/` or on the specific VM pool. Then Save in Settings again |
+| `401 Unauthorized` | Token ID or secret wrong, or Privilege Separation mismatch | Copy again. Make sure the token ID is exactly `widget@pve!monitor` and the header is `PVEAPIToken=...` |
+| Dashboard shows `No clusters` after restart | Config dir cleared or different user | Check that you run as the same OS user that saved the settings. Look in the config dir path shown in `--dev` logs |
+| Tray icon missing on Windows | Icon in overflow or app still starting | Open the hidden icons chevron, drag ProxmoxWidget out. With `pythonw` there is no console to show startup errors, so run once with `--dev` if it still hides |
+| High CPU | Poll interval too low or many clusters | Bump the interval to 30 or 60 seconds in Settings |
+| Self signed cert error | `CERTIFICATE_VERIFY_FAILED` | Add your CA to the OS store, or toggle verify off for that cluster in Settings as a last resort |
+
+Still stuck? Run `python -m proxmox_widget --dev` and copy the log lines that mention the cluster ID, not the token.
 
 ## Dev
 
 ```bash
+# setup
+uv venv && uv pip install -e ".[dev]"
+
+# lint and types
 ruff check src tests
+ruff format src tests
 basedpyright src
+
+# tests
 pytest
+pytest --cov=proxmox_widget --cov-report=term-missing
+
+# run the app in dev mode with console and verbose logs
+python -m proxmox_widget --dev
+# or
+uv run proxmox-widget --dev
+```
+
+Project layout:
+
+```
+src/proxmox_widget/
+  __main__.py        # entry, pythonw handling, --dev flag
+  config/models.py   # cluster, health, storage models
+  resources/app.png  # source icon, hero and screenshots
+  resources/app.ico  # Windows icon, used by Nuitka
+  resources/icons.py # make_app_icon, make_tray_icon
+  ui/dashboard.py    # popup dashboard, tabs, banners, progress bars
+  ui/tray.py         # tray menu, tooltip, left-click vs right-click
 ```
 
 ## Packaging
 
+This repo builds a single file exe with Nuitka. No PyInstaller.
+
 ```bash
-# PyInstaller / briefcase / nuitka — TODO
+# Windows onefile, no console, icon from app.ico
+python -m nuitka --onefile --windows-console-mode=disable --windows-icon-from-ico=src/proxmox_widget/resources/app.ico --include-data-files=src/proxmox_widget/resources/app.png=proxmox_widget/resources/app.png --output-filename=ProxmoxWidget.exe src/proxmox_widget/__main__.py
+
+# Linux onefile
+python -m nuitka --onefile --output-filename=ProxmoxWidget.bin src/proxmox_widget/__main__.py
+
+# macOS app bundle
+python -m nuitka --standalone --macos-create-app-bundle --macos-app-icon=src/proxmox_widget/resources/app.png --output-dir=dist src/proxmox_widget/__main__.py
 ```
+
+Local helpers that mirror CI flags:
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts/build-nuitka.ps1
+# Linux / macOS
+bash scripts/build-nuitka.sh
+# optional: bash scripts/build-nuitka.sh --clean
+```
+
+Notes:
+
+- `--windows-console-mode=disable` is the `pythonw` behavior for the built exe. Use `--dev` at runtime if you need a console.
+- Keep `app.ico` with 256, 128, 64, 48, 32, 16 sizes so the exe shows crisp at every scale.
+- Data file include for `app.png` is optional if you rely only on `make_app_icon` code gen, but it guarantees the hero renders even offline.
+- CI runs `ruff check`, `basedpyright src`, `pytest -q` on Python 3.11 and 3.12 via `.github/workflows/ci.yml`; releases are built by `.github/workflows/release.yml` (tag `v*` triggers Nuitka matrix + `softprops/action-gh-release` with `SHA256SUMS.txt`).
+
+## Roadmap
+
+- [ ] Real screenshots for the next release tag, light and dark theme
+- [ ] Per-VM sparkline for CPU over last 10 polls
+- [ ] Notifications opt in for node down and VM crash, still via in-app banner plus optional OS notify
+- [ ] Search and filter on VMs and Containers tabs
+- [ ] Bulk actions for a whole node
+- [ ] Import and export clusters as JSON
+- [ ] Auto updater check against GitHub releases
+
+Have an idea? Open an issue with the label `enhancement` and a short screencast.
+
+## FAQ
+
+**Is ProxmoxWidget an official Proxmox project?**
+No. It is a community tray client that talks to the Proxmox VE API. Proxmox and PVE are trademarks of Proxmox Server Solutions GmbH.
+
+**Does it work on macOS and Linux?**
+Yes. The tray uses PySide6 Qt. On macOS it lives in the menu bar. On Linux it needs a system tray like on KDE or GNOME with AppIndicator.
+
+**What permissions does the API token need?**
+Read only needs `PVEAuditor` and `VM.Audit` on `/`. Add `VM.PowerMgmt` only if you want Start, Stop, Reboot from the widget.
+
+**Why do I not see a console on Windows?**
+The app ships to run with `pythonw`, so no console pops. Run `python -m proxmox_widget --dev` or `ProxmoxWidget.exe --dev` to get logs.
+
+**Why does an action stay on `WAIT` for a while?**
+The widget polls after Start, Stop, or Reboot until the guest reaches the target status. Slow storage or a stuck guest can take a minute. The busy badge clears when the poll matches.
+
+**How is this different from opening Proxmox in a browser?**
+It is faster for quick checks. One click shows health, resource bars, and controls for all clusters. Use Open Proxmox when you need the full UI.
+
+**Where are settings stored?**
+In the platform config dir via `platformdirs` and secrets in the OS keyring. Uninstalling the pip package does not delete config. Remove the config dir by hand if you want a clean slate.
+
+## Keywords and SEO
+
+`proxmox`, `pve`, `pve-monitoring`, `proxmox-ve`, `proxmox-widget`, `system-tray`, `tray-app`, `pyside6`, `qt6`, `homelab`, `desktop-client`, `api-token`, `least-privilege`, `vm-management`, `lxc`, `storage-monitoring`, `python-3.11`, `nuitka`, `windows-tray`, `macos-menu-bar`, `linux-tray`
+
+If you host a homelab blog, link to this repo with the phrase `Proxmox VE desktop client for the system tray` and it helps others find it.
+
+---
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE) if present, else `pyproject.toml` license field.
+
+Logo and icons are part of the repo under the same license unless noted. The Proxmox name is not included in the license.
+
+---
+
+<p align="center">
+  <sub>Built for homelabs that like their infra live and their tokens least-priv. If it saves you a tab, star it.</sub>
+</p>

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "ProxmoxWidget" }]
-keywords = ["proxmox", "pve", "system-tray", "desktop", "monitoring"]
+keywords = ["proxmox", "pve", "pve-monitoring", "proxmox-ve", "system-tray", "tray-app", "desktop", "monitoring", "homelab", "pyside6", "qt6", "vm-management", "lxc"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications :: Qt",
