@@ -1,92 +1,43 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, Qt, Signal
-from PySide6.QtGui import QPainter, QPixmap
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-try:
-    from PySide6.QtSvg import QSvgRenderer
-except ImportError:
-    QSvgRenderer = None  # type: ignore
-
 from proxmox_widget.config.models import ClusterHealth
 from proxmox_widget.resources.icons import make_app_icon
+from proxmox_widget.ui import icons
+from proxmox_widget.ui.themes import DARK, palette_for, qss_for
 from proxmox_widget.utils.format import fmt_bytes, fmt_uptime
 
-ICONS = {
-    "cluster": "🏢",
-    "node": "🖥️",
-    "vm": "🖥️",
-    "ct": "📦",
-    "storage": "💾",
-    "net": "🌐",
-    "health": "💚",
-    "warn": "⚠️",
-    "offline": "🔴",
-    "online": "🟢",
-    "paused": "🟡",
-}
-
-# per-metric inline SVG templates — stroke 1.8, currentColor, 14-16px
-_SVG_ICONS: dict[str, str] = {
-    "cpu": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4.3" y="4.3" width="7.4" height="7.4" rx="1.2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 1.6v2.1M10 1.6v2.1M6 12.3v2.1M10 12.3v2.1M1.6 6h2.1M1.6 10h2.1M12.3 6h2.1M12.3 10h2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="6.7" y="6.7" width="2.6" height="2.6" rx="0.4" stroke="currentColor" stroke-width="1.4"/></svg>',
-    "ram": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.4" y="3.2" width="11.2" height="9.6" rx="1.4" stroke="currentColor" stroke-width="1.8"/><path d="M5.2 5.2v5.6M8 5.2v5.6M10.8 5.2v5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.4 7.2h11.2M2.4 9.8h11.2" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.9"/><circle cx="8" cy="12.8" r="0.6" fill="currentColor"/></svg>',
-    "disk": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="8" cy="4.8" rx="5" ry="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M3 4.8v6.9c0 1.33 2.24 2.4 5 2.4s5-1.07 5-2.4V4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="8" cy="11.7" rx="5" ry="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M3 8.2c0 1.33 2.24 2.4 5 2.4s5-1.07 5-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/></svg>',
-    "status": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="3.2" fill="currentColor" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.2" opacity="0.25"/></svg>',
-    "uptime": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="5.4" stroke="currentColor" stroke-width="1.8"/><path d="M8 5.4v3.1l2.2 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-}
+# tab keys, in tab-bar order
+OVERVIEW, NODES, VMS, CTS, STORAGE = "overview", "nodes", "vms", "cts", "storage"
+LIST_TABS = (NODES, VMS, CTS, STORAGE)
 
 
-def _icon_svg(name: str, size: int = 14) -> QLabel:
-    """Return QLabel with crisp inline SVG icon — stroke 1.8, currentColor, 14-16px."""
-    lbl = QLabel()
-    lbl.setFixedSize(size, size)
-    lbl.setStyleSheet("background: transparent;")
-    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    svg = _SVG_ICONS.get(name, _SVG_ICONS["status"])
-    color = "#8d91b0"
-    svg_colored = svg.replace("currentColor", color)
-    if QSvgRenderer is not None:
-        try:
-            dpr = lbl.devicePixelRatioF()
-            if dpr is None or dpr < 1.0:
-                dpr = 2.0
-            # ensure at least 2x for retina crispness
-            if dpr < 1.5:
-                dpr = 2.0
-            px = max(1, int(size * dpr))
-            renderer = QSvgRenderer(QByteArray(svg_colored.encode("utf-8")))
-            pixmap = QPixmap(px, px)
-            pixmap.setDevicePixelRatio(dpr)
-            pixmap.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-            renderer.render(painter)
-            painter.end()
-            lbl.setPixmap(pixmap)
-            return lbl
-        except Exception:
-            pass
-    # fallback: text dot if svg render unavailable
-    lbl.setText("·")
-    lbl.setStyleSheet("background: transparent; color: #8d91b0; font-size: 10px;")
-    return lbl
+def _plural(n: int, word: str) -> str:
+    return word if n == 1 else f"{word}s"
 
 
 class Dashboard(QWidget):
     open_settings = Signal()
     open_proxmox_requested = Signal()
+    refresh_requested = Signal()
+    # cluster_id, node, vmid, action, is_lxc
     action_requested = Signal(str, str, int, str, bool)
+    # cluster_id, node, vmid, kind ("novnc" | "spice" | "rdp" | "shell"), is_lxc
+    console_requested = Signal(str, str, int, str, bool)
 
     def __init__(self) -> None:
         super().__init__()
@@ -96,72 +47,28 @@ class Dashboard(QWidget):
             | Qt.WindowType.Popup
             | Qt.WindowType.NoDropShadowWindowHint
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-        self.setFixedWidth(440)
-        self.setMinimumHeight(560)
-        self.setMaximumHeight(800)
+        self.setFixedWidth(468)
+        self.setMinimumHeight(620)
+        self.setMaximumHeight(900)
+        self.pal: dict[str, str] = DARK
         self._health: list[ClusterHealth] = []
+        self._clusters: dict[str, object] = {}
         self._busy: dict[tuple[str, int, bool], str] = {}
+        self._panes: dict[str, QWidget] = {}
+        self._search: dict[str, QLineEdit] = {}
+        self._counts: dict[str, QLabel] = {}
+        self._running_only: dict[str, QPushButton] = {}
         self._build()
+
+    # ------------------------------------------------------------------ chrome
 
     def _build(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(20, 20, 20, 16)
+        root.setContentsMargins(16, 14, 16, 12)
         root.setSpacing(10)
-        self._banner = QFrame()
-        self._banner.setObjectName("banner")
-        self._banner.setVisible(False)
-        self._banner.setStyleSheet(
-            "QFrame#banner { background: #2a2d45; border: 1.5px solid #3a3d53; border-radius: 8px; }"
-        )
-        bl = QHBoxLayout(self._banner)
-        bl.setContentsMargins(10, 8, 10, 8)
-        bl.setSpacing(8)
-        self._banner_icon = QLabel()
-        self._banner_icon.setFixedWidth(18)
-        bl.addWidget(self._banner_icon, 0)
-        self._banner_label = QLabel()
-        self._banner_label.setWordWrap(True)
-        self._banner_label.setStyleSheet("font-size: 12px; font-weight: 500;")
-        bl.addWidget(self._banner_label, 1)
-        self._banner_close = QPushButton("✕")
-        self._banner_close.setFixedSize(22, 22)
-        self._banner_close.setObjectName("ghost")
-        self._banner_close.setStyleSheet("font-size: 11px; padding: 0px;")
-        self._banner_close.clicked.connect(lambda: self._banner.setVisible(False))
-        bl.addWidget(self._banner_close, 0)
-        root.addWidget(self._banner)
-        from PySide6.QtCore import QTimer as _QTimer
 
-        self._banner_timer = _QTimer(self)
-        self._banner_timer.setSingleShot(True)
-        self._banner_timer.timeout.connect(lambda: self._banner.setVisible(False))
-
-        header = QHBoxLayout()
-        header.setSpacing(10)
-        # app icon
-        icon_lbl = QLabel()
-        icon_lbl.setPixmap(make_app_icon(28).pixmap(28, 28))
-        icon_lbl.setFixedSize(28, 28)
-        icon_lbl.setStyleSheet("background: transparent;")
-        header.addWidget(icon_lbl, 0)
-        title_col = QVBoxLayout()
-        title_col.setSpacing(1)
-        title = QLabel("ProxmoxWidget")
-        title.setObjectName("title")
-        subtitle = QLabel("live infrastructure  •  least-priv ready")
-        subtitle.setObjectName("subtitle")
-        title_col.addWidget(title)
-        title_col.addWidget(subtitle)
-        header.addLayout(title_col, 1)
-        header.addStretch()
-        btn_settings = QPushButton("⚙")
-        btn_settings.setObjectName("ghost")
-        btn_settings.setFixedSize(36, 36)
-        btn_settings.setToolTip("Settings")
-        btn_settings.clicked.connect(lambda: self.open_settings.emit())
-        header.addWidget(btn_settings)
-        root.addLayout(header)
+        root.addWidget(self._build_banner())
+        root.addLayout(self._build_header())
 
         sep = QFrame()
         sep.setObjectName("lineSep")
@@ -170,63 +77,184 @@ class Dashboard(QWidget):
         root.addWidget(sep)
 
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
         root.addWidget(self.tabs, 1)
+        for key, title in (
+            (OVERVIEW, "Overview"),
+            (NODES, "Nodes"),
+            (VMS, "VMs"),
+            (CTS, "LXC"),
+            (STORAGE, "Storage"),
+        ):
+            self.tabs.addTab(self._build_tab(key), title)
 
-        self.tab_dashboard = QWidget()
-        self.tab_nodes = QWidget()
-        self.tab_vms = QWidget()
-        self.tab_cts = QWidget()
-        self.tab_storage = QWidget()
+        root.addLayout(self._build_footer())
 
-        self.tabs.addTab(self._wrap_scroll(self.tab_dashboard), "Dashboard")
-        self.tabs.addTab(self._wrap_scroll(self.tab_nodes), "Nodes")
-        self.tabs.addTab(self._wrap_scroll(self.tab_vms), "VMs")
-        self.tabs.addTab(self._wrap_scroll(self.tab_cts), "Containers")
-        self.tabs.addTab(self._wrap_scroll(self.tab_storage), "Storage")
-
-        for w in [self.tab_dashboard, self.tab_nodes, self.tab_vms, self.tab_cts, self.tab_storage]:
-            lay = QVBoxLayout(w)
-            lay.setContentsMargins(4, 8, 4, 8)
-            lay.setSpacing(10)
-            lay.addStretch()
-
-        footer = QHBoxLayout()
-        footer.setSpacing(8)
-        self.btn_open = QPushButton("↗  Open Proxmox")
-        self.btn_open.setObjectName("primary")
-        self.btn_open.clicked.connect(lambda: self.open_proxmox_requested.emit())
-        footer.addWidget(self.btn_open, 1)
-        self.btn_refresh = QPushButton("↻")
-        self.btn_refresh.setObjectName("ghost")
-        self.btn_refresh.setFixedSize(40, 36)
-        self.btn_refresh.setToolTip("Refresh now")
-        self.btn_refresh.clicked.connect(lambda: self._placeholder_refresh())
-        footer.addWidget(self.btn_refresh)
-        root.addLayout(footer)
-
-        self.lbl_status = QLabel("No clusters — open Settings → Add Cluster")
-        self.lbl_status.setObjectName("muted")
+        self.lbl_status = QLabel("No clusters — open Settings then Add Cluster")
+        self.lbl_status.setObjectName("meta")
         self.lbl_status.setWordWrap(True)
-        self.lbl_status.setContentsMargins(2, 0, 2, 0)
         root.addWidget(self.lbl_status)
 
-    def _wrap_scroll(self, w: QWidget) -> QScrollArea:
+    def _build_banner(self) -> QFrame:
+        self._banner = QFrame()
+        self._banner.setObjectName("banner")
+        self._banner.setVisible(False)
+        bl = QHBoxLayout(self._banner)
+        bl.setContentsMargins(10, 8, 8, 8)
+        bl.setSpacing(8)
+        self._banner_icon = QLabel()
+        self._banner_icon.setFixedSize(16, 16)
+        bl.addWidget(self._banner_icon, 0, Qt.AlignmentFlag.AlignTop)
+        self._banner_label = QLabel()
+        self._banner_label.setWordWrap(True)
+        bl.addWidget(self._banner_label, 1)
+        close = QPushButton()
+        close.setObjectName("ghost")
+        close.setIcon(icons.icon("close", 12, DARK["text_dim"]))
+        close.setFixedSize(22, 22)
+        close.clicked.connect(lambda: self._banner.setVisible(False))
+        bl.addWidget(close, 0, Qt.AlignmentFlag.AlignTop)
+        self._banner_timer = QTimer(self)
+        self._banner_timer.setSingleShot(True)
+        self._banner_timer.timeout.connect(lambda: self._banner.setVisible(False))
+        return self._banner
+
+    def _build_header(self) -> QHBoxLayout:
+        header = QHBoxLayout()
+        header.setSpacing(10)
+        app_icon = QLabel()
+        app_icon.setPixmap(make_app_icon(26).pixmap(26, 26))
+        app_icon.setFixedSize(26, 26)
+        header.addWidget(app_icon, 0)
+
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        title = QLabel("ProxmoxWidget")
+        title.setObjectName("title")
+        self.lbl_sub = QLabel("connecting…")
+        self.lbl_sub.setObjectName("subtitle")
+        col.addWidget(title)
+        col.addWidget(self.lbl_sub)
+        header.addLayout(col, 1)
+        header.addStretch()
+
+        self.btn_refresh = self._icon_button("refresh", "Refresh now")
+        self.btn_refresh.clicked.connect(self._on_refresh_clicked)
+        header.addWidget(self.btn_refresh)
+        self.btn_settings = self._icon_button("settings", "Settings")
+        self.btn_settings.clicked.connect(lambda: self.open_settings.emit())
+        header.addWidget(self.btn_settings)
+        return header
+
+    def _build_footer(self) -> QHBoxLayout:
+        footer = QHBoxLayout()
+        footer.setSpacing(8)
+        self.btn_open = QPushButton("  Open Proxmox")
+        self.btn_open.setObjectName("primary")
+        self.btn_open.setIcon(icons.icon("external", 15, DARK["accent_ink"]))
+        self.btn_open.setMinimumHeight(34)
+        self.btn_open.clicked.connect(lambda: self.open_proxmox_requested.emit())
+        footer.addWidget(self.btn_open, 1)
+        return footer
+
+    def _icon_button(self, name: str, tip: str) -> QPushButton:
+        b = QPushButton()
+        b.setObjectName("ghost")
+        b.setIcon(icons.icon(name, 15, self.pal["text_dim"]))
+        b.setFixedSize(32, 30)
+        b.setToolTip(tip)
+        return b
+
+    def _build_tab(self, key: str) -> QWidget:
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 4, 0, 0)
+        lay.setSpacing(8)
+
+        if key in LIST_TABS:
+            lay.addWidget(self._build_search(key))
+
+        content = QWidget()
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(1, 2, 6, 8)
+        content_lay.setSpacing(10)
+        content_lay.addStretch()
+        self._panes[key] = content
+
         sa = QScrollArea()
         sa.setWidgetResizable(True)
         sa.setFrameShape(QFrame.Shape.NoFrame)
-        sa.setWidget(w)
         sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        sa.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        return sa
+        sa.setWidget(content)
+        lay.addWidget(sa, 1)
+        return page
+
+    def _build_search(self, key: str) -> QFrame:
+        placeholder = {
+            NODES: "Search nodes…",
+            VMS: "Search VMs by name, id or node…",
+            CTS: "Search containers…",
+            STORAGE: "Search storage…",
+        }[key]
+        bar = QFrame()
+        bar.setObjectName("searchBar")
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(1, 0, 6, 0)
+        lay.setSpacing(6)
+
+        edit = QLineEdit()
+        edit.setPlaceholderText(placeholder)
+        edit.setClearButtonEnabled(True)
+        edit.addAction(
+            icons.icon("search", 14, self.pal["text_faint"]),
+            QLineEdit.ActionPosition.LeadingPosition,
+        )
+        edit.textChanged.connect(lambda _t, k=key: self._rebuild(k))
+        edit.setMinimumHeight(30)
+        self._search[key] = edit
+        lay.addWidget(edit, 1)
+
+        if key in (VMS, CTS):
+            chip = QPushButton("Running")
+            chip.setObjectName("chip")
+            chip.setCheckable(True)
+            chip.setToolTip("Show only running guests")
+            chip.setFixedHeight(30)
+            chip.toggled.connect(lambda _c, k=key: self._rebuild(k))
+            self._running_only[key] = chip
+            lay.addWidget(chip, 0)
+
+        count = QLabel("")
+        count.setObjectName("meta")
+        count.setMinimumWidth(38)
+        count.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._counts[key] = count
+        lay.addWidget(count, 0)
+        return bar
+
+    # ------------------------------------------------------------------- theme
+
+    def apply_theme(self, theme: str) -> None:
+        self.pal = palette_for(theme)
+        self.setStyleSheet(qss_for(theme))
+        self.btn_refresh.setIcon(icons.icon("refresh", 15, self.pal["text_dim"]))
+        self.btn_settings.setIcon(icons.icon("settings", 15, self.pal["text_dim"]))
+        self.btn_open.setIcon(icons.icon("external", 15, self.pal["accent_ink"]))
+        for edit in self._search.values():
+            for act in edit.actions():
+                act.setIcon(icons.icon("search", 14, self.pal["text_faint"]))
+        self._rebuild_all()
+
+    # -------------------------------------------------------------- public API
 
     def set_clusters(self, clusters: list) -> None:
         self._clusters = {c.id: c for c in clusters}
         if clusters:
-            self.btn_open.setText(f"↗  Open {clusters[0].name}")
+            self.btn_open.setText(f"  Open {clusters[0].name}")
             self.btn_open.setToolTip(clusters[0].base_url)
             self.btn_open.setEnabled(True)
         else:
-            self.btn_open.setText("↗  Open Proxmox")
+            self.btn_open.setText("  Open Proxmox")
             self.btn_open.setEnabled(False)
 
     def set_busy(self, cluster_id: str, vmid: int, is_lxc: bool, action: str | None) -> None:
@@ -235,446 +263,573 @@ class Dashboard(QWidget):
             self._busy.pop(key, None)
         else:
             self._busy[key] = action
-        self.update_health(self._health)
+        self._rebuild_all()
 
     def clear_busy(self) -> None:
         self._busy.clear()
-        self.update_health(self._health)
+        self._rebuild_all()
 
     def show_message(self, text: str, kind: str = "info", duration_ms: int = 4500) -> None:
-        colors = {
-            "info": ("#89b4fa", "ℹ️"),
-            "success": ("#a6e3a1", "✓"),
-            "warning": ("#f9e2af", "⚠️"),
-            "error": ("#f38ba8", "✕"),
-        }
-        color, icon = colors.get(kind, ("#89b4fa", "ℹ️"))
-        self._banner_icon.setText(icon)
-        self._banner_icon.setStyleSheet(f"color: {color}; font-weight: 700;")
+        icon_name = {"info": "info", "success": "check", "warning": "warn", "error": "error"}.get(
+            kind, "info"
+        )
+        color = {
+            "info": self.pal["info"],
+            "success": self.pal["ok"],
+            "warning": self.pal["warn"],
+            "error": self.pal["err"],
+        }.get(kind, self.pal["info"])
+        self._banner_icon.setPixmap(icons.pixmap(icon_name, 16, color))
         self._banner_label.setText(text)
-        self._banner_label.setStyleSheet("color: #cdd6f4; font-size: 12px;")
+        self._banner_label.setStyleSheet(f"color: {self.pal['text']}; font-size: 12px;")
         self._banner.setStyleSheet(
-            f"QFrame#banner {{ background: #2a2d45; border: 1.5px solid {color}; border-radius: 8px; }}"
+            f"QFrame#banner {{ background: {self.pal['surface']};"
+            f" border: 1px solid {color}; border-left: 3px solid {color}; border-radius: 8px; }}"
         )
         self._banner.setVisible(True)
         self._banner_timer.start(duration_ms)
 
-    def _placeholder_refresh(self) -> None:
-        self.show_message("Refreshing…", "info", 1500)
-
     def update_health(self, health: list[ClusterHealth]) -> None:
         self._health = health
-        for w in [self.tab_dashboard, self.tab_nodes, self.tab_vms, self.tab_cts, self.tab_storage]:
-            lay = w.layout()
-            assert lay is not None
-            while lay.count():
-                item = lay.takeAt(0)
-                if item and item.widget():
-                    item.widget().deleteLater()
-            lay.addStretch()
-
         if not health:
-            self.lbl_status.setText("No clusters — Settings → Add Cluster (e.g. 192.168.10.2:8006)")
+            self.lbl_sub.setText("no clusters configured")
+            self.lbl_status.setText("Settings then Add Cluster — host, port 8006, API token")
+        else:
+            online = sum(1 for h in health if h.online)
+            nodes = sum(len(h.nodes) for h in health)
+            vms = [vm for h in health for vm in h.vms]
+            cts = [ct for h in health for ct in h.containers]
+            running = sum(1 for g in vms + cts if g.status == "running")
+            self.lbl_sub.setText(
+                f"{online}/{len(health)} {_plural(len(health), 'cluster')} online  ·  "
+                f"{nodes} {_plural(nodes, 'node')}  ·  {running} running"
+            )
+            self.lbl_status.setText(
+                f"{len(vms)} VMs  ·  {len(cts)} containers  ·  "
+                f"{sum(len(h.storages) for h in health)} storages"
+            )
+        self._rebuild_all()
+
+    # ----------------------------------------------------------------- rebuild
+
+    def _on_refresh_clicked(self) -> None:
+        self.show_message("Refreshing…", "info", 1500)
+        self.refresh_requested.emit()
+
+    def _rebuild_all(self) -> None:
+        for key in (OVERVIEW, *LIST_TABS):
+            self._rebuild(key)
+
+    def _clear(self, key: str) -> QVBoxLayout:
+        pane = self._panes[key]
+        lay = pane.layout()
+        assert isinstance(lay, QVBoxLayout)
+        while lay.count():
+            item = lay.takeAt(0)
+            w = item.widget() if item else None
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        lay.addStretch()
+        return lay
+
+    def _query(self, key: str) -> str:
+        edit = self._search.get(key)
+        return edit.text().strip().lower() if edit else ""
+
+    @staticmethod
+    def _matches(query: str, *fields: object) -> bool:
+        if not query:
+            return True
+        return any(query in str(f).lower() for f in fields)
+
+    def _rebuild(self, key: str) -> None:
+        lay = self._clear(key)
+        if not self._health:
+            for c in self._counts.values():
+                c.setText("")
+            self._empty(lay, "No clusters yet — add one in Settings.")
             return
+        builder = {
+            OVERVIEW: self._fill_overview,
+            NODES: self._fill_nodes,
+            VMS: self._fill_vms,
+            CTS: self._fill_cts,
+            STORAGE: self._fill_storage,
+        }[key]
+        shown, total = builder(lay)
+        if key in self._counts:
+            self._counts[key].setText(f"{shown}/{total}" if shown != total else str(total))
+        if shown == 0:
+            q = self._query(key)
+            self._empty(lay, f'Nothing matches "{q}".' if q else "Nothing here yet.")
 
-        online_count = sum(1 for h in health if h.online)
-        total_nodes = sum(len(h.nodes) for h in health)
-        total_vms = sum(len(h.vms) for h in health)
-        total_cts = sum(len(h.containers) for h in health)
-        self.lbl_status.setText(
-            f"{online_count}/{len(health)} clusters • {total_nodes} nodes • {total_vms} VMs • {total_cts} containers"
-        )
+    def _empty(self, lay: QVBoxLayout, text: str) -> None:
+        lbl = QLabel(text)
+        lbl.setObjectName("empty")
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setWordWrap(True)
+        lay.insertWidget(lay.count() - 1, lbl)
 
-        for h in health:
-            self._add_cluster_to_dashboard(h)
-            self._add_nodes(h)
-            self._add_vms(h)
-            self._add_cts(h)
-            self._add_storage(h)
+    # ------------------------------------------------------------ card widgets
 
-    def _card(self, parent_layout: QVBoxLayout) -> tuple[QFrame, QVBoxLayout]:
+    def _card(self, parent: QVBoxLayout, accent: str) -> tuple[QVBoxLayout, QVBoxLayout]:
+        """Card with a coloured left rail, a header block and a body block.
+
+        The rail plus the header fill is what separates one guest from the next —
+        a flat list of rows was unreadable once more than a couple were on screen.
+        """
         card = QFrame()
         card.setObjectName("card")
-        try:
-            from PySide6.QtGui import QColor
-            from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        outer = QHBoxLayout(card)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-            eff = QGraphicsDropShadowEffect(card)
-            eff.setBlurRadius(24)
-            eff.setOffset(0, 8)
-            eff.setColor(QColor(0, 0, 0, 90))
-            card.setGraphicsEffect(eff)
-        except Exception:
-            pass
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 16, 16, 16)
-        lay.setSpacing(10)
-        parent_layout.insertWidget(parent_layout.count() - 1, card)
-        return card, lay
+        rail = QFrame()
+        rail.setObjectName("accent")
+        rail.setFixedWidth(3)
+        rail.setStyleSheet(f"QFrame#accent {{ background: {accent}; }}")
+        outer.addWidget(rail, 0)
 
-    def _section_row(
-        self, icon: str, title: str, badge: str | None = None, badge_color: str | None = None
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
+
+        head_frame = QFrame()
+        head_frame.setObjectName("cardHead")
+        head = QVBoxLayout(head_frame)
+        head.setContentsMargins(12, 9, 12, 9)
+        head.setSpacing(3)
+        col.addWidget(head_frame)
+
+        body_frame = QFrame()
+        body_frame.setObjectName("cardBody")
+        body = QVBoxLayout(body_frame)
+        body.setContentsMargins(12, 10, 12, 11)
+        body.setSpacing(7)
+        col.addWidget(body_frame)
+
+        outer.addLayout(col, 1)
+        parent.insertWidget(parent.count() - 1, card)
+        return head, body
+
+    def _dot(self, color: str) -> QLabel:
+        d = QLabel()
+        d.setFixedSize(9, 9)
+        d.setStyleSheet(f"background: {color}; border-radius: 4px;")
+        return d
+
+    def _pill(self, text: str, color: str) -> QLabel:
+        p = QLabel(text.upper())
+        p.setObjectName("pill")
+        p.setStyleSheet(
+            f"color: {color}; border: 1px solid {color}; border-radius: 6px;"
+            " padding: 1px 6px; font-size: 10px; font-weight: 800;"
+        )
+        return p
+
+    def _title_row(
+        self, icon_name: str, text: str, right: list[QWidget] | None = None, dot: str | None = None
     ) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(8)
-        lbl = QLabel(f"{icon}  {title}")
+        row.setSpacing(7)
+        if dot:
+            row.addWidget(self._dot(dot), 0)
+        else:
+            row.addWidget(icons.label(icon_name, 15, self.pal["text_dim"]), 0)
+        lbl = QLabel(text)
         lbl.setObjectName("cardTitle")
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         row.addWidget(lbl, 1)
-        if badge:
-            b = QLabel(badge)
-            b.setObjectName("badge")
-            b.setFixedHeight(20)
-            if badge_color:
-                b.setStyleSheet(
-                    f"background: {badge_color}; color: white; border-radius: 8px; padding: 2px 8px; font-size: 10.5px; font-weight: 700;"
-                )
-            row.addWidget(b, 0)
+        for w in right or []:
+            row.addWidget(w, 0)
         return row
 
-    def _add_cluster_to_dashboard(self, h: ClusterHealth) -> None:
-        lay = self.tab_dashboard.layout()
-        assert isinstance(lay, QVBoxLayout)
-        _, card_lay = self._card(lay)
-        badge = "ONLINE" if h.online else "OFFLINE"
-        color = "#2ecc71" if h.online else "#ff3b30"
-        card_lay.addLayout(self._section_row(ICONS["cluster"], f"{h.cluster_name}", badge, color))
-        sub = QLabel(f"{h.cluster_id}  ·  {len(h.nodes)} nodes")
-        sub.setObjectName("muted")
-        card_lay.addWidget(sub)
-        if not h.online:
-            err = QLabel(h.error or "Offline")
-            err.setObjectName("muted")
-            err.setWordWrap(True)
-            err.setStyleSheet("color:#f38ba8;")
-            card_lay.addWidget(err)
-            return
-        for n in h.nodes:
-            ndot = ICONS["online"] if n.status == "online" else ICONS["offline"]
-            line = QLabel(f"{ndot}  {n.node}  ·  {fmt_uptime(n.uptime)}  ·  {n.maxcpu}c")
-            line.setObjectName("muted")
-            card_lay.addWidget(line)
-            for name, label, val, oid in [
-                ("cpu", "CPU", n.cpu, ""),
-                ("ram", "RAM", n.mem / n.maxmem if n.maxmem else 0, "ram"),
-                ("disk", "Disk", n.disk / n.maxdisk if n.maxdisk else 0, "disk"),
-            ]:
-                row = QHBoxLayout()
-                row.setSpacing(8)
-                row.addWidget(_icon_svg(name, size=14), 0)
-                lk = QLabel(label)
-                lk.setFixedWidth(40)
-                lk.setObjectName("muted")
-                row.addWidget(lk)
-                bar = QProgressBar()
-                if oid:
-                    bar.setObjectName(oid)
-                bar.setRange(0, 100)
-                bar.setValue(int(val * 100))
-                bar.setFormat(f"{int(val * 100)}%")
-                bar.setFixedHeight(14)
-                row.addWidget(bar, 1)
-                card_lay.addLayout(row)
-        if h.vms or h.containers:
-            sep = QFrame()
-            sep.setObjectName("lineSep")
-            sep.setFrameShape(QFrame.Shape.HLine)
-            sep.setFixedHeight(1)
-            card_lay.addWidget(sep)
-            summ = QLabel(
-                f"{ICONS['vm']} {len(h.vms)} VMs  ·  {ICONS['ct']} {len(h.containers)} containers  ·  {ICONS['storage']} {len(h.storages)} storages"
-            )
-            summ.setObjectName("muted")
-            card_lay.addWidget(summ)
+    def _meta_row(self, parts: list[tuple[str, str]]) -> QHBoxLayout:
+        """Small icon plus text pairs on one line, e.g. node, cores, uptime."""
+        row = QHBoxLayout()
+        row.setSpacing(5)
+        for i, (icon_name, text) in enumerate(parts):
+            if i:
+                dotsep = QLabel("·")
+                dotsep.setObjectName("meta")
+                row.addWidget(dotsep, 0)
+            row.addWidget(icons.label(icon_name, 12, self.pal["text_faint"]), 0)
+            lbl = QLabel(text)
+            lbl.setObjectName("meta")
+            row.addWidget(lbl, 0)
+        row.addStretch(1)
+        return row
 
-    def _kv_with_svg(self, icon_name: str, label: str, value: str) -> QWidget:
+    def _metric(self, kind: str, name: str, pct: float, detail: str = "") -> QWidget:
+        pct_i = max(0, min(100, round(pct)))
         w = QWidget()
-        lay = QHBoxLayout(w)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(6)
-        lay.addWidget(_icon_svg(icon_name, size=14), 0)
-        lbl = QLabel(f"{label}  ·  {value}")
+        w.setObjectName("metricRow")
+        row = QHBoxLayout(w)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        row.addWidget(icons.label(kind, 13, self.pal["text_faint"]), 0)
+
+        lbl = QLabel(name)
         lbl.setObjectName("muted")
-        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        lbl.setWordWrap(True)
-        lay.addWidget(lbl, 1)
+        lbl.setFixedWidth(34)
+        row.addWidget(lbl, 0)
+
+        bar = QProgressBar()
+        bar.setTextVisible(False)
+        bar.setRange(0, 100)
+        bar.setValue(pct_i)
+        if pct_i >= 90:
+            bar.setObjectName("hot")
+        elif kind == "ram":
+            bar.setObjectName("ram")
+        elif kind == "disk":
+            bar.setObjectName("disk")
+        bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        row.addWidget(bar, 1)
+
+        val = QLabel(f"{pct_i}%")
+        val.setObjectName("value")
+        val.setFixedWidth(32)
+        val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(val, 0)
+
+        det = QLabel(detail)
+        det.setObjectName("meta")
+        det.setFixedWidth(104)
+        det.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(det, 0)
         return w
 
-    def _add_nodes(self, h: ClusterHealth) -> None:
-        lay = self.tab_nodes.layout()
-        assert isinstance(lay, QVBoxLayout)
-        for n in h.nodes:
-            _, cl = self._card(lay)
-            color = "#2ecc71" if n.status == "online" else "#ff3b30"
-            cl.addLayout(self._section_row(ICONS["node"], n.node, n.status.upper(), color))
-            sub = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {n.maxcpu}c  ·  {fmt_uptime(n.uptime)}")
-            sub.setObjectName("muted")
-            cl.addWidget(sub)
-            for name, label, used, total, oid in [
-                ("cpu", "CPU", n.cpu, 1.0, ""),
-                ("ram", "RAM", n.mem, n.maxmem, "ram"),
-                ("disk", "Disk", n.disk, n.maxdisk, "disk"),
-            ]:
-                pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
-                row = QHBoxLayout()
-                row.setSpacing(8)
-                row.addWidget(_icon_svg(name, size=14), 0)
-                lk = QLabel(label)
-                lk.setFixedWidth(40)
-                lk.setObjectName("muted")
-                row.addWidget(lk)
-                bar = QProgressBar()
-                if oid:
-                    bar.setObjectName(oid)
-                bar.setRange(0, 100)
-                bar.setValue(int(pct))
-                bar.setFormat(f"{int(pct)}%")
-                row.addWidget(bar, 1)
-                cl.addLayout(row)
-                if oid:
-                    det = QLabel(f"{fmt_bytes(int(used))} / {fmt_bytes(int(total))}")
-                    det.setObjectName("muted")
-                    det.setStyleSheet("font-size: 10.5px; margin-left: 66px;")
-                    cl.addWidget(det)
-            cl.addWidget(self._kv_with_svg("status", "Status", n.status))
-            cl.addWidget(self._kv_with_svg("uptime", "Uptime", fmt_uptime(n.uptime)))
+    def _action_button(self, icon_name: str, text: str, tip: str = "") -> QPushButton:
+        b = QPushButton(f" {text}")
+        b.setIcon(icons.icon(icon_name, 13, self.pal["text_dim"]))
+        b.setFixedHeight(28)
+        b.setToolTip(tip or text)
+        return b
 
-    def _add_vms(self, h: ClusterHealth) -> None:
-        lay = self.tab_vms.layout()
-        assert isinstance(lay, QVBoxLayout)
-        for vm in h.vms:
-            _, cl = self._card(lay)
-            busy = self._busy.get((h.cluster_id, vm.vmid, False))
-            dot = (
-                ICONS["online"]
-                if vm.status == "running"
-                else ICONS["offline"]
-                if vm.status == "stopped"
-                else ICONS["paused"]
-            )
-            head = QHBoxLayout()
-            head.setSpacing(8)
-            lbl_name = QLabel(f"{dot}  {vm.name}")
-            lbl_name.setObjectName("cardTitle")
-            lbl_name.setWordWrap(True)
-            head.addWidget(lbl_name, 1)
-            if busy:
-                b = QLabel(f"⏳ {busy.upper()}")
-                b.setStyleSheet(
-                    "background:#f9e2af; color:#1e1e2e; border-radius:8px; padding:2px 8px; font-size:10.5px; font-weight:700;"
-                )
-                b.setFixedWidth(88)
-                b.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                head.addWidget(b, 0)
-            lbl_id = QLabel(f"#{vm.vmid}")
-            lbl_id.setObjectName("badge")
-            lbl_id.setFixedWidth(62)
-            lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            head.addWidget(lbl_id, 0)
-            cl.addLayout(head)
-            if busy:
-                prog = QProgressBar()
-                prog.setRange(0, 0)
-                prog.setFixedHeight(6)
-                prog.setTextVisible(False)
-                cl.addWidget(prog)
-            loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {vm.node}")
-            loc.setObjectName("muted")
-            cl.addWidget(loc)
-            status_color = (
-                "#f9e2af"
-                if busy
-                else (
-                    "#2ecc71"
-                    if vm.status == "running"
-                    else "#ff3b30"
-                    if vm.status == "stopped"
-                    else "#f1c40f"
+    def _status_color(self, status: str, busy: str | None = None) -> str:
+        if busy:
+            return self.pal["warn"]
+        return {
+            "running": self.pal["ok"],
+            "online": self.pal["ok"],
+            "available": self.pal["ok"],
+            "paused": self.pal["warn"],
+            "stopped": self.pal["err"],
+            "offline": self.pal["err"],
+        }.get(status, self.pal["text_faint"])
+
+    # ------------------------------------------------------------- tab fillers
+
+    def _fill_overview(self, lay: QVBoxLayout) -> tuple[int, int]:
+        for h in self._health:
+            color = self.pal["ok"] if h.online else self.pal["err"]
+            head, body = self._card(lay, color)
+            head.addLayout(
+                self._title_row(
+                    "cluster",
+                    h.cluster_name,
+                    right=[self._pill("online" if h.online else "offline", color)],
+                    dot=color,
                 )
             )
-            status_txt = busy if busy else vm.status
-            cl.addWidget(
-                self._kv_with_svg(
-                    "status",
-                    "Status",
-                    f'<span style="color:{status_color}; font-weight:600;">{status_txt}</span>'
-                    + ("  · template" if vm.template else ""),
+            head.addLayout(
+                self._meta_row(
+                    [
+                        ("network", h.cluster_id),
+                        ("node", f"{len(h.nodes)} {_plural(len(h.nodes), 'node')}"),
+                    ]
                 )
             )
-            cl.addWidget(self._kv_with_svg("cpu", "vCPUs", str(vm.cpus)))
-            if vm.status == "running":
-                for name, label, used, total, oid in [
-                    ("cpu", "CPU", vm.cpu, 1.0, ""),
-                    ("ram", "RAM", vm.mem, vm.maxmem, "ram"),
-                ]:
-                    pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
-                    row = QHBoxLayout()
-                    row.setSpacing(8)
-                    row.addWidget(_icon_svg(name, size=14), 0)
-                    lk = QLabel(label)
-                    lk.setFixedWidth(40)
-                    lk.setObjectName("muted")
-                    row.addWidget(lk)
-                    bar = QProgressBar()
-                    if oid:
-                        bar.setObjectName(oid)
-                    bar.setRange(0, 100)
-                    bar.setValue(pct)
-                    bar.setFormat(f"{pct}%")
-                    row.addWidget(bar, 1)
-                    cl.addLayout(row)
-            else:
-                cl.addWidget(self._kv_with_svg("cpu", "CPU", f"{vm.cpu * 100:.0f}%"))
-                cl.addWidget(
-                    self._kv_with_svg("ram", "RAM", f"{fmt_bytes(vm.mem)} / {fmt_bytes(vm.maxmem)}")
+            if not h.online:
+                err = QLabel(h.error or "Cluster unreachable")
+                err.setWordWrap(True)
+                err.setStyleSheet(f"color: {self.pal['err']}; font-size: 12px;")
+                body.addWidget(err)
+                continue
+
+            running_vms = sum(1 for vm in h.vms if vm.status == "running")
+            running_cts = sum(1 for ct in h.containers if ct.status == "running")
+            body.addLayout(
+                self._stat_strip(
+                    [
+                        ("vm", "VMs", f"{running_vms}/{len(h.vms)}"),
+                        ("ct", "LXC", f"{running_cts}/{len(h.containers)}"),
+                        ("storage", "Storage", str(len(h.storages))),
+                    ]
                 )
-            row = QHBoxLayout()
-            row.setSpacing(6)
-            for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
-                b = QPushButton(label)
-                b.setFixedHeight(30)
-                b.setEnabled(vm.status != "unknown" and not busy)
-                b.clicked.connect(
-                    lambda _=False, a=act, vm=vm: self.action_requested.emit(
-                        h.cluster_id, vm.node, vm.vmid, a, False
+            )
+            for n in h.nodes:
+                sep = QFrame()
+                sep.setObjectName("lineSep")
+                sep.setFixedHeight(1)
+                body.addWidget(sep)
+                body.addLayout(
+                    self._meta_row(
+                        [
+                            ("node", n.node),
+                            ("cpu", f"{n.maxcpu} {_plural(n.maxcpu, 'core')}"),
+                            ("uptime", fmt_uptime(n.uptime)),
+                        ]
                     )
                 )
-                row.addWidget(b, 1)
-            cl.addLayout(row)
-
-    def _add_cts(self, h: ClusterHealth) -> None:
-        lay = self.tab_cts.layout()
-        assert isinstance(lay, QVBoxLayout)
-        for ct in h.containers:
-            _, cl = self._card(lay)
-            busy = self._busy.get((h.cluster_id, ct.vmid, True))
-            dot = ICONS["online"] if ct.status == "running" else ICONS["offline"]
-            head = QHBoxLayout()
-            head.setSpacing(8)
-            lbl_name = QLabel(f"{dot}  {ct.name}")
-            lbl_name.setObjectName("cardTitle")
-            lbl_name.setWordWrap(True)
-            head.addWidget(lbl_name, 1)
-            if busy:
-                b = QLabel(f"⏳ {busy.upper()}")
-                b.setStyleSheet(
-                    "background:#f9e2af; color:#1e1e2e; border-radius:8px; padding:2px 8px; font-size:10.5px; font-weight:700;"
-                )
-                b.setFixedWidth(88)
-                b.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                head.addWidget(b, 0)
-            lbl_id = QLabel(f"#{ct.vmid}")
-            lbl_id.setObjectName("badge")
-            lbl_id.setFixedWidth(62)
-            lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            head.addWidget(lbl_id, 0)
-            cl.addLayout(head)
-            if busy:
-                prog = QProgressBar()
-                prog.setRange(0, 0)
-                prog.setFixedHeight(6)
-                prog.setTextVisible(False)
-                cl.addWidget(prog)
-            loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {ct.node}")
-            loc.setObjectName("muted")
-            cl.addWidget(loc)
-            color = "#f9e2af" if busy else ("#2ecc71" if ct.status == "running" else "#ff3b30")
-            status_txt = busy if busy else ct.status
-            cl.addWidget(
-                self._kv_with_svg(
-                    "status",
-                    "Status",
-                    f'<span style="color:{color}; font-weight:600;">{status_txt}</span>',
-                )
-            )
-            if ct.status == "running":
-                for name, label, used, total, oid in [
-                    ("cpu", "CPU", ct.cpu, 1.0, ""),
-                    ("ram", "RAM", ct.mem, ct.maxmem, "ram"),
-                ]:
-                    pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
-                    row = QHBoxLayout()
-                    row.setSpacing(8)
-                    row.addWidget(_icon_svg(name, size=14), 0)
-                    lk = QLabel(label)
-                    lk.setFixedWidth(40)
-                    lk.setObjectName("muted")
-                    row.addWidget(lk)
-                    bar = QProgressBar()
-                    if oid:
-                        bar.setObjectName(oid)
-                    bar.setRange(0, 100)
-                    bar.setValue(pct)
-                    bar.setFormat(f"{pct}%")
-                    row.addWidget(bar, 1)
-                    cl.addLayout(row)
-            else:
-                cl.addWidget(
-                    self._kv_with_svg("ram", "RAM", f"{fmt_bytes(ct.mem)} / {fmt_bytes(ct.maxmem)}")
-                )
-            row = QHBoxLayout()
-            row.setSpacing(6)
-            for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
-                b = QPushButton(label)
-                b.setFixedHeight(30)
-                b.setEnabled(not busy)
-                b.clicked.connect(
-                    lambda _=False, a=act, ct=ct: self.action_requested.emit(
-                        h.cluster_id, ct.node, ct.vmid, a, True
+                body.addWidget(self._metric("cpu", "CPU", n.cpu * 100))
+                body.addWidget(
+                    self._metric(
+                        "ram",
+                        "RAM",
+                        (n.mem / n.maxmem * 100) if n.maxmem else 0,
+                        f"{fmt_bytes(n.mem)} / {fmt_bytes(n.maxmem)}",
                     )
                 )
-                row.addWidget(b, 1)
-            cl.addLayout(row)
+                body.addWidget(
+                    self._metric(
+                        "disk",
+                        "Disk",
+                        (n.disk / n.maxdisk * 100) if n.maxdisk else 0,
+                        f"{fmt_bytes(n.disk)} / {fmt_bytes(n.maxdisk)}",
+                    )
+                )
+        return len(self._health), len(self._health)
 
-    def _add_storage(self, h: ClusterHealth) -> None:
-        lay = self.tab_storage.layout()
-        assert isinstance(lay, QVBoxLayout)
-        for s in h.storages:
-            _, cl = self._card(lay)
-            cl.addLayout(self._section_row(ICONS["storage"], s.storage, s.type.upper()))
-            sub_row = QHBoxLayout()
-            sub_row.setSpacing(6)
-            # node icon keeps emoji, status uses SVG
-            node_lbl = QLabel(f"{ICONS['node']} {s.node}")
-            node_lbl.setObjectName("muted")
-            sub_row.addWidget(node_lbl, 0)
-            sub_row.addWidget(_icon_svg("status", size=12), 0)
-            status_lbl = QLabel(s.status)
-            status_lbl.setObjectName("muted")
-            sub_row.addWidget(status_lbl, 0)
-            shared_lbl = QLabel("shared" if s.shared else "local")
-            shared_lbl.setObjectName("muted")
-            sub_row.addWidget(shared_lbl, 0)
-            sub_row.addStretch(1)
-            cl.addLayout(sub_row)
-            used_pct = (s.used / s.total * 100) if s.total else 0
-            row = QHBoxLayout()
-            row.setSpacing(8)
-            row.addWidget(_icon_svg("disk", size=14), 0)
-            lk = QLabel("Use")
-            lk.setFixedWidth(40)
-            lk.setObjectName("muted")
-            row.addWidget(lk)
-            bar = QProgressBar()
-            bar.setObjectName("disk")
-            bar.setRange(0, 100)
-            bar.setValue(int(used_pct))
-            bar.setFormat(f"{used_pct:.0f}%")
-            row.addWidget(bar, 1)
-            cl.addLayout(row)
-            det = QLabel(
-                f"{fmt_bytes(s.used)} / {fmt_bytes(s.total)}  ·  {fmt_bytes(s.avail)} free"
+    def _stat_strip(self, items: list[tuple[str, str, str]]) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        for icon_name, label_text, value in items:
+            tile = QFrame()
+            tile.setObjectName("tile")
+            tile.setStyleSheet(
+                f"QFrame#tile {{ background: {self.pal['surface_hi']};"
+                f" border: 1px solid {self.pal['border']}; border-radius: 8px; }}"
             )
-            det.setObjectName("muted")
-            det.setStyleSheet("font-size: 10.5px; margin-left: 66px;")
-            cl.addWidget(det)
-            if not s.enabled:
-                warn = QLabel(f"{ICONS['warn']} disabled")
-                warn.setStyleSheet("color: #f38ba8; font-size: 11px; font-weight: 600;")
-                cl.addWidget(warn)
-
-    def _kv(self, k: str, v: str) -> QLabel:
-        row = QLabel(f"{k}  ·  {v}")
-        row.setObjectName("muted")
-        row.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        row.setWordWrap(True)
+            tl = QVBoxLayout(tile)
+            tl.setContentsMargins(10, 7, 10, 7)
+            tl.setSpacing(2)
+            top = QHBoxLayout()
+            top.setSpacing(5)
+            top.addWidget(icons.label(icon_name, 12, self.pal["text_faint"]), 0)
+            cap = QLabel(label_text)
+            cap.setObjectName("meta")
+            top.addWidget(cap, 1)
+            tl.addLayout(top)
+            val = QLabel(value)
+            val.setStyleSheet(f"color: {self.pal['text']}; font-size: 15px; font-weight: 700;")
+            tl.addWidget(val)
+            row.addWidget(tile, 1)
         return row
+
+    def _fill_nodes(self, lay: QVBoxLayout) -> tuple[int, int]:
+        q = self._query(NODES)
+        total = shown = 0
+        for h in self._health:
+            for n in h.nodes:
+                total += 1
+                if not self._matches(q, n.node, n.status, h.cluster_name):
+                    continue
+                shown += 1
+                color = self._status_color(n.status)
+                head, body = self._card(lay, color)
+                head.addLayout(
+                    self._title_row("node", n.node, right=[self._pill(n.status, color)], dot=color)
+                )
+                head.addLayout(
+                    self._meta_row(
+                        [
+                            ("cluster", h.cluster_name),
+                            ("cpu", f"{n.maxcpu} {_plural(n.maxcpu, 'core')}"),
+                            ("uptime", fmt_uptime(n.uptime)),
+                        ]
+                    )
+                )
+                body.addWidget(self._metric("cpu", "CPU", n.cpu * 100))
+                body.addWidget(
+                    self._metric(
+                        "ram",
+                        "RAM",
+                        (n.mem / n.maxmem * 100) if n.maxmem else 0,
+                        f"{fmt_bytes(n.mem)} / {fmt_bytes(n.maxmem)}",
+                    )
+                )
+                body.addWidget(
+                    self._metric(
+                        "disk",
+                        "Disk",
+                        (n.disk / n.maxdisk * 100) if n.maxdisk else 0,
+                        f"{fmt_bytes(n.disk)} / {fmt_bytes(n.maxdisk)}",
+                    )
+                )
+                row = QHBoxLayout()
+                row.setSpacing(6)
+                shell = self._action_button("console", "Shell", f"noVNC shell on {n.node}")
+                shell.clicked.connect(
+                    lambda _=False, cid=h.cluster_id, node=n.node: self.console_requested.emit(
+                        cid, node, 0, "shell", False
+                    )
+                )
+                row.addWidget(shell, 1)
+                web = self._action_button("external", "Web UI", "Open the Proxmox web UI")
+                web.clicked.connect(lambda _=False: self.open_proxmox_requested.emit())
+                row.addWidget(web, 1)
+                body.addLayout(row)
+        return shown, total
+
+    def _guest_card(self, lay: QVBoxLayout, h: ClusterHealth, g, is_lxc: bool) -> None:
+        busy = self._busy.get((h.cluster_id, g.vmid, is_lxc))
+        status = busy if busy else g.status
+        color = self._status_color(g.status, busy)
+        head, body = self._card(lay, color)
+
+        vmid_badge = QLabel(f"#{g.vmid}")
+        vmid_badge.setObjectName("badge")
+        head.addLayout(
+            self._title_row(
+                "ct" if is_lxc else "vm",
+                g.name,
+                right=[self._pill(status, color), vmid_badge],
+                dot=color,
+            )
+        )
+        meta = [("node", g.node), ("cpu", f"{g.cpus} vCPU")]
+        if g.status == "running" and g.uptime:
+            meta.append(("uptime", fmt_uptime(g.uptime)))
+        if getattr(g, "template", False):
+            meta.append(("shield", "template"))
+        head.addLayout(self._meta_row(meta))
+
+        if busy:
+            prog = QProgressBar()
+            prog.setObjectName("busy")
+            prog.setRange(0, 0)
+            prog.setTextVisible(False)
+            body.addWidget(prog)
+
+        running = g.status == "running"
+        if running:
+            body.addWidget(self._metric("cpu", "CPU", g.cpu * 100))
+            body.addWidget(
+                self._metric(
+                    "ram",
+                    "RAM",
+                    (g.mem / g.maxmem * 100) if g.maxmem else 0,
+                    f"{fmt_bytes(g.mem)} / {fmt_bytes(g.maxmem)}",
+                )
+            )
+            if is_lxc and g.maxdisk:
+                body.addWidget(
+                    self._metric(
+                        "disk",
+                        "Disk",
+                        g.disk / g.maxdisk * 100,
+                        f"{fmt_bytes(g.disk)} / {fmt_bytes(g.maxdisk)}",
+                    )
+                )
+        else:
+            idle = QLabel(f"Allocated {fmt_bytes(g.maxmem)} RAM  ·  {g.cpus} vCPU")
+            idle.setObjectName("meta")
+            body.addWidget(idle)
+
+        power = QHBoxLayout()
+        power.setSpacing(6)
+        for icon_name, text, act, enabled in (
+            ("play", "Start", "start", not running),
+            ("stop", "Stop", "stop", running),
+            ("restart", "Reboot", "reboot", running),
+        ):
+            b = self._action_button(icon_name, text)
+            b.setEnabled(enabled and not busy)
+            b.clicked.connect(
+                lambda _=False, a=act, node=g.node, vmid=g.vmid: self.action_requested.emit(
+                    h.cluster_id, node, vmid, a, is_lxc
+                )
+            )
+            power.addWidget(b, 1)
+        body.addLayout(power)
+
+        console = QHBoxLayout()
+        console.setSpacing(6)
+        consoles: list[tuple[str, str, str, str]] = [
+            ("console", "Console", "novnc", "Open the noVNC web console"),
+        ]
+        if not is_lxc:
+            consoles.append(("monitor", "SPICE", "spice", "Open with remote-viewer over SPICE"))
+            consoles.append(("remote", "RDP", "rdp", "RDP to the guest IP, needs the guest agent"))
+        for icon_name, text, kind, tip in consoles:
+            b = self._action_button(icon_name, text, tip)
+            b.setEnabled(running)
+            b.clicked.connect(
+                lambda _=False, k=kind, node=g.node, vmid=g.vmid: self.console_requested.emit(
+                    h.cluster_id, node, vmid, k, is_lxc
+                )
+            )
+            console.addWidget(b, 1)
+        body.addLayout(console)
+
+    def _fill_guests(self, lay: QVBoxLayout, key: str, is_lxc: bool) -> tuple[int, int]:
+        q = self._query(key)
+        only_running = self._running_only[key].isChecked()
+        total = shown = 0
+        for h in self._health:
+            guests = h.containers if is_lxc else h.vms
+            ordered = sorted(guests, key=lambda g: (g.status != "running", g.name.lower()))
+            for g in ordered:
+                total += 1
+                if only_running and g.status != "running":
+                    continue
+                if not self._matches(q, g.name, g.vmid, g.node, g.status, h.cluster_name):
+                    continue
+                shown += 1
+                self._guest_card(lay, h, g, is_lxc)
+        return shown, total
+
+    def _fill_vms(self, lay: QVBoxLayout) -> tuple[int, int]:
+        return self._fill_guests(lay, VMS, False)
+
+    def _fill_cts(self, lay: QVBoxLayout) -> tuple[int, int]:
+        return self._fill_guests(lay, CTS, True)
+
+    def _fill_storage(self, lay: QVBoxLayout) -> tuple[int, int]:
+        q = self._query(STORAGE)
+        total = shown = 0
+        for h in self._health:
+            for s in h.storages:
+                total += 1
+                if not self._matches(q, s.storage, s.type, s.node, s.status):
+                    continue
+                shown += 1
+                pct = (s.used / s.total * 100) if s.total else 0
+                color = (
+                    self.pal["err"]
+                    if pct >= 90 or not s.enabled
+                    else self.pal["warn"]
+                    if pct >= 75
+                    else self._status_color(s.status)
+                )
+                head, body = self._card(lay, color)
+                badge = QLabel(s.type.upper() or "DIR")
+                badge.setObjectName("badge")
+                # rail warns on how full the store is; the pill still states the API status
+                head.addLayout(
+                    self._title_row(
+                        "storage",
+                        s.storage,
+                        right=[self._pill(s.status, self._status_color(s.status)), badge],
+                        dot=color,
+                    )
+                )
+                head.addLayout(
+                    self._meta_row(
+                        [
+                            ("node", s.node),
+                            ("network", "shared" if s.shared else "local"),
+                            ("check", "enabled" if s.enabled else "disabled"),
+                        ]
+                    )
+                )
+                body.addWidget(
+                    self._metric("disk", "Used", pct, f"{fmt_bytes(s.used)} / {fmt_bytes(s.total)}")
+                )
+                free = QLabel(f"{fmt_bytes(s.avail)} free")
+                free.setObjectName("meta")
+                body.addWidget(free)
+        return shown, total

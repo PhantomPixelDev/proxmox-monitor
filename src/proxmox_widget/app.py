@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 from proxmox_widget.api.client import ProxmoxClient
 from proxmox_widget.config.manager import load_settings
 from proxmox_widget.config.models import ClusterHealth
+from proxmox_widget.core import launcher
 from proxmox_widget.core.notifier import Notifier
 from proxmox_widget.resources.icons import make_app_icon, make_tray_icon
 from proxmox_widget.ui.dashboard import Dashboard
@@ -55,6 +56,8 @@ class ProxmoxWidgetApp:
         self.dashboard.open_settings.connect(self.show_settings)
         self.dashboard.open_proxmox_requested.connect(self._open_proxmox)
         self.dashboard.action_requested.connect(self._on_action)
+        self.dashboard.console_requested.connect(self._on_console)
+        self.dashboard.refresh_requested.connect(self.refresh_now)
         self.notifier.notification_requested.connect(self._on_notify)
         self.tray.set_clusters(self.settings.clusters)
         self.dashboard.set_clusters(self.settings.clusters)
@@ -65,9 +68,9 @@ class ProxmoxWidgetApp:
         logger.info("notify {} {}", title, msg)
 
     def _apply_theme(self) -> None:
-        qss = qss_for(self.settings.theme.value)
-        self.app.setStyleSheet(qss)
-        self.dashboard.setStyleSheet(qss)
+        theme = self.settings.theme.value
+        self.app.setStyleSheet(qss_for(theme))
+        self.dashboard.apply_theme(theme)
 
     def start(self) -> None:
         interval = max(5, self.settings.refresh_interval_seconds)
@@ -163,6 +166,85 @@ class ProxmoxWidgetApp:
         alerts = sum(1 for h in results if not h.online)
         self.tray_icon.setIcon(make_tray_icon(64, online=(online > 0), alerts=alerts))
         self.notifier.check(results)
+
+    def _guest_name(self, cluster_id: str, vmid: int, is_lxc: bool) -> str:
+        for h in self._health:
+            if h.cluster_id != cluster_id:
+                continue
+            for g in h.containers if is_lxc else h.vms:
+                if g.vmid == vmid:
+                    return g.name
+        return str(vmid)
+
+    def _on_console(self, cluster_id: str, node: str, vmid: int, kind: str, is_lxc: bool) -> None:
+        cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
+        if not cluster:
+            return
+        client = ProxmoxClient(cluster)
+
+        if kind == "shell":
+            launcher.open_url(client.node_shell_url(node))
+            self.dashboard.show_message(f"Opening shell on {node}…", "info", 2500)
+            return
+
+        if kind == "novnc":
+            name = self._guest_name(cluster_id, vmid, is_lxc)
+            launcher.open_url(client.console_url(node, vmid, name, is_lxc=is_lxc))
+            self.dashboard.show_message(f"Opening console for {name}…", "info", 2500)
+            return
+
+        if kind == "spice":
+            self.dashboard.show_message(f"Requesting SPICE ticket for {vmid}…", "info", 2500)
+
+            async def _spice() -> None:
+                try:
+                    cfg = await client.spice_config(node, vmid)
+                    path = launcher.open_spice(ProxmoxClient.spice_vv(cfg), vmid)
+                    logger.info("spice file {}", path)
+                    self.dashboard.show_message("SPICE handed to remote-viewer", "success", 3000)
+                except Exception as e:
+                    logger.error("spice failed: {}", e)
+                    self.dashboard.show_message(f"SPICE failed: {str(e)[:160]}", "error", 5000)
+
+            self._run_async(_spice)
+            return
+
+        if kind == "rdp":
+            self.dashboard.show_message("Asking the guest agent for an IP…", "info", 2500)
+
+            async def _rdp() -> None:
+                try:
+                    ips = await client.agent_ips(node, vmid)
+                except Exception as e:
+                    logger.error("agent lookup failed: {}", e)
+                    self.dashboard.show_message(
+                        f"No guest agent on {vmid} — cannot resolve an IP", "error", 5000
+                    )
+                    return
+                if not ips:
+                    self.dashboard.show_message(
+                        f"Guest agent on {vmid} reported no IPv4 address", "warning", 5000
+                    )
+                    return
+                if launcher.open_rdp(ips[0]):
+                    self.dashboard.show_message(f"RDP → {ips[0]}", "success", 3000)
+                else:
+                    self.dashboard.show_message(
+                        "No RDP client installed (mstsc, xfreerdp, remmina)", "error", 5000
+                    )
+
+            self._run_async(_rdp)
+
+    def _run_async(self, coro_factory) -> None:  # type: ignore[no-untyped-def]
+        def _run() -> None:
+            try:
+                asyncio.run(coro_factory())
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(coro_factory())
+
+        QTimer.singleShot(0, _run)
 
     def _on_action(self, cluster_id: str, node: str, vmid: int, action: str, is_lxc: bool) -> None:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)

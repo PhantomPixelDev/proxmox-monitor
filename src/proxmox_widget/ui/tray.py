@@ -7,6 +7,8 @@ from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from proxmox_widget.config.models import ClusterHealth
+from proxmox_widget.ui import icons
+from proxmox_widget.ui.themes import DARK
 
 
 class TrayManager(QObject):
@@ -29,26 +31,25 @@ class TrayManager(QObject):
 
     def _build_menu(self) -> None:
         m = QMenu()
-        m.setStyleSheet(
-            "QMenu { padding: 6px; } QMenu::item { padding: 7px 18px 7px 14px; border-radius: 6px; } QMenu::item:selected { background: #34374e; } QMenu::separator { height: 1px; background: #3a3d53; margin: 6px 8px; }"
-        )
-        self.act_show = QAction("🖥  Show Dashboard", m)
+        ink = DARK["text_dim"]
+        self.act_show = QAction(icons.icon("vm", 15, ink), "Show Dashboard", m)
         self.act_show.triggered.connect(lambda: self.show_dashboard.emit())
         m.addAction(self.act_show)
 
-        self.act_refresh = QAction("↻  Refresh now", m)
+        self.act_refresh = QAction(icons.icon("refresh", 15, ink), "Refresh now", m)
         self.act_refresh.triggered.connect(lambda: self.refresh_requested.emit())
         m.addAction(self.act_refresh)
         m.addSeparator()
 
-        self._open_menu = m.addMenu("↗  Open Proxmox")
+        self._open_menu = m.addMenu("Open Proxmox")
+        self._open_menu.setIcon(icons.icon("external", 15, ink))
         self._rebuild_open_menu()
 
-        self.act_settings = QAction("⚙  Settings", m)
+        self.act_settings = QAction(icons.icon("settings", 15, ink), "Settings", m)
         self.act_settings.triggered.connect(lambda: self.show_settings.emit())
         m.addAction(self.act_settings)
         m.addSeparator()
-        act_quit = QAction("✕  Quit", m)
+        act_quit = QAction(icons.icon("close", 15, ink), "Quit", m)
         act_quit.triggered.connect(lambda: self.quit_requested.emit())
         m.addAction(act_quit)
         self.tray.setContextMenu(m)
@@ -69,7 +70,7 @@ class TrayManager(QObject):
             a.triggered.connect(lambda _=False, url=c.base_url: webbrowser.open(url))
             self._open_menu.addAction(a)
         if len(self._clusters) == 1:
-            self._open_menu.setTitle(f"↗  Open {self._clusters[0].name}")
+            self._open_menu.setTitle(f"Open {self._clusters[0].name}")
 
     def set_clusters(self, clusters: list) -> None:
         self._clusters = list(clusters)

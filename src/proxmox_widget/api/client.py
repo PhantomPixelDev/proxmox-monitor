@@ -277,6 +277,71 @@ class ProxmoxClient:
             storages=all_stor,
         )
 
+    # ---- console / remote access -------------------------------------------------
+
+    def console_url(self, node: str, vmid: int, name: str = "", is_lxc: bool = False) -> str:
+        """noVNC web-console deep link into the Proxmox UI."""
+        from urllib.parse import urlencode
+
+        q = {
+            "console": "lxc" if is_lxc else "kvm",
+            "novnc": 1,
+            "vmid": vmid,
+            "vmname": name or str(vmid),
+            "node": node,
+            "resize": "off",
+        }
+        return f"{self.cluster.base_url}/?{urlencode(q)}"
+
+    def node_shell_url(self, node: str) -> str:
+        """noVNC shell for a node."""
+        from urllib.parse import urlencode
+
+        return (
+            f"{self.cluster.base_url}/?{urlencode({'console': 'shell', 'novnc': 1, 'node': node})}"
+        )
+
+    async def spice_config(self, node: str, vmid: int) -> dict[str, Any]:
+        """POST spiceproxy — returns the key/values that make up a .vv file."""
+        data = await self._post(f"/nodes/{node}/qemu/{vmid}/spiceproxy")
+        if not isinstance(data, dict):
+            raise ActionFailedError(f"spiceproxy returned no config for {vmid}")
+        return data
+
+    @staticmethod
+    def spice_vv(config: dict[str, Any]) -> str:
+        """Render a remote-viewer .vv file from a spiceproxy response."""
+        lines = ["[virt-viewer]"]
+        for k, v in config.items():
+            if v is None:
+                continue
+            if isinstance(v, bool):
+                v = 1 if v else 0
+            lines.append(f"{k}={v}")
+        return chr(10).join(lines) + chr(10)
+
+    async def agent_ips(self, node: str, vmid: int) -> list[str]:
+        """IPv4 addresses reported by the QEMU guest agent (loopback/link-local dropped)."""
+        try:
+            data = await self._get(f"/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces")
+        except Exception as e:
+            raise ActionFailedError(f"guest agent unavailable on {vmid}: {e}") from e
+        ifaces = data.get("result", data) if isinstance(data, dict) else data
+        out: list[str] = []
+        for iface in ifaces or []:
+            if not isinstance(iface, dict):
+                continue
+            if (iface.get("name") or "").lower().startswith("lo"):
+                continue
+            for addr in iface.get("ip-addresses") or []:
+                ip = str(addr.get("ip-address", ""))
+                if addr.get("ip-address-type") != "ipv4" or not ip:
+                    continue
+                if ip.startswith(("127.", "169.254.")):
+                    continue
+                out.append(ip)
+        return out
+
     async def vm_action(self, node: str, vmid: int, action: str, is_lxc: bool = False) -> str:
         kind = "lxc" if is_lxc else "qemu"
         path = f"/nodes/{node}/{kind}/{vmid}/status/{action}"

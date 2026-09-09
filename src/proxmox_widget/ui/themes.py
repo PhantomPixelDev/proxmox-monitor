@@ -1,242 +1,319 @@
 from __future__ import annotations
 
-DARK_QSS = """
-/* --- ProxmoxWidget Dark | Catppuccin Mocha + refined spacing --- */
-QWidget {
-    background: #1e1e2e;
-    color: #cdd6f4;
-    font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 14px;
-}
-QWidget#root { background: #1e1e2e; }
+import pathlib
 
-/* cards — high-contrast, clearly separated */
-QFrame#card {
-    background: #2b2e4a;
-    border: 2px solid #6d72a3;
-    border-radius: 12px;
-}
-QFrame#card:hover { border-color: #6d72a3; }
-QFrame#cardHeader {
-    background: #32365a;
-    border-bottom: 1.5px solid #4a4e7a;
-    border-top-left-radius: 11px;
-    border-top-right-radius: 11px;
+# --- palettes -----------------------------------------------------------------
+# Kept as dicts so widgets can pull the same colours the stylesheet uses
+# (status accents, chart bars) instead of hardcoding hex twice.
+
+DARK = {
+    "bg": "#151623",
+    "surface": "#1e2032",
+    "surface_hi": "#272a40",
+    "header": "#242739",
+    "border": "#343850",
+    "border_hi": "#454a6b",
+    "text": "#e7eaf6",
+    "text_dim": "#a5abc9",
+    "text_faint": "#7f86a8",
+    "accent": "#7aa2f7",
+    "accent_ink": "#10121c",
+    "ok": "#4ade80",
+    "warn": "#fbbf24",
+    "err": "#f87171",
+    "info": "#7aa2f7",
+    "bar_track": "#2c2f45",
 }
 
-/* typography */
-QLabel#title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #cdd6f4;
-    letter-spacing: 0.2px;
+LIGHT = {
+    "bg": "#f3f4f9",
+    "surface": "#ffffff",
+    "surface_hi": "#f7f8fc",
+    "header": "#f6f7fc",
+    "border": "#d9dded",
+    "border_hi": "#b9c0da",
+    "text": "#171a2b",
+    "text_dim": "#5b6180",
+    "text_faint": "#7d83a0",
+    "accent": "#2f6bed",
+    "accent_ink": "#ffffff",
+    "ok": "#16a34a",
+    "warn": "#c2820a",
+    "err": "#dc2626",
+    "info": "#2f6bed",
+    "bar_track": "#e6e9f2",
 }
-QLabel#subtitle { font-size: 12px; color: #a6adc8; }
-QLabel#muted { color: #8d91b0; font-size: 12px; }
-QLabel#badge {
-    background: #3a3d53;
-    color: #bac2de;
-    border-radius: 8px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-}
-QLabel#cardTitle { font-size: 14.5px; font-weight: 600; color: #cdd6f4; }
-QLabel { padding: 1px 0px; }
 
-/* buttons */
-QPushButton {
-    background: #34374e;
-    color: #cdd6f4;
-    border: 1px solid #3f425c;
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 12.5px;
-    font-weight: 500;
-}
-QPushButton:hover { background: #3e415e; border-color: #4c4f6e; }
-QPushButton:pressed { background: #2e3148; }
-QPushButton:disabled { background: #2a2d42; color: #6c7086; border-color: #31344a; }
-QPushButton#primary {
-    background: #89b4fa;
-    color: #1e1e2e;
-    border: none;
-    font-weight: 700;
-    padding: 8px 16px;
-}
-QPushButton#primary:hover { background: #a6ccff; }
-QPushButton#primary:pressed { background: #74a6f0; }
-QPushButton#ghost {
-    background: transparent;
-    border: 1px solid #3a3d53;
-    color: #a6adc8;
-}
-QPushButton#ghost:hover { background: #25273d; color: #cdd6f4; }
-
-/* progress */
-QProgressBar {
-    background: #34374e;
-    border: 1px solid #3a3d53;
-    border-radius: 7px;
-    text-align: center;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #cdd6f4;
-    min-height: 14px;
-    max-height: 14px;
-}
-QProgressBar::chunk {
-    background: #89b4fa;
+_QSS_TEMPLATE = """
+/* --- ProxmoxWidget ------------------------------------------------------- */
+QWidget {{
+    background: {bg};
+    color: {text};
+    font-family: "Segoe UI", "Inter", "Noto Sans", sans-serif;
+    font-size: 13px;
+}}
+QWidget#root {{ background: {bg}; }}
+QToolTip {{
+    background: {surface_hi};
+    color: {text};
+    border: 1px solid {border_hi};
     border-radius: 6px;
-    margin: 1px;
-}
-QProgressBar#ram::chunk { background: #a6e3a1; }
-QProgressBar#disk::chunk { background: #f9e2af; }
+    padding: 5px 8px;
+}}
 
-/* tabs */
-QTabWidget::pane {
+/* --- cards: every row is its own solid block with a visible edge ---------- */
+QFrame#card {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 10px;
+}}
+QFrame#card:hover {{ border-color: {border_hi}; }}
+QFrame#cardHead {{
+    background: {header};
     border: none;
-    background: transparent;
-    margin-top: 8px;
-}
-QTabBar::tab {
-    background: #25273d;
-    color: #8d91b0;
-    border: 1px solid #3a3d53;
-    border-radius: 8px;
-    padding: 7px 14px;
-    margin-right: 6px;
-    font-size: 12.5px;
-    font-weight: 500;
-    min-width: 48px;
-}
-QTabBar::tab:selected {
-    background: #34374e;
-    color: #cdd6f4;
-    border-color: #4c4f6e;
-}
-QTabBar::tab:hover { background: #2e3148; color: #bac2de; }
+    border-bottom: 1px solid {border};
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+}}
+QFrame#cardBody {{ background: transparent; border: none; }}
+QWidget#metricRow {{ background: transparent; }}
+QFrame#tile QLabel {{ background: transparent; border: none; }}
+QFrame#accent {{ border: none; border-top-left-radius: 9px; border-bottom-left-radius: 9px; }}
 
-/* scrollbars */
-QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical {
-    background: transparent;
-    width: 8px;
-    margin: 4px 2px 4px 0px;
-}
-QScrollBar::handle:vertical {
-    background: #3a3d53;
-    border-radius: 4px;
-    min-height: 30px;
-}
-QScrollBar::handle:vertical:hover { background: #4c4f6e; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-
-/* separators */
-QFrame#lineSep { background: #31344a; max-height: 1px; border: none; }
-"""
-
-LIGHT_QSS = """
-QWidget {
-    background: #eff1f5;
-    color: #4c4f69;
-    font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 14px;
-}
-QWidget#root { background: #eff1f5; }
-
-QFrame#card {
-    background: #ffffff;
-    border: 2px solid #c8cde0;
-    border-radius: 12px;
-}
-QFrame#cardHeader {
-    background: #f2f4f9;
-    border-bottom: 1.5px solid #d8dce9;
-    border-top-left-radius: 11px;
-    border-top-right-radius: 11px;
-}
-
-QLabel#title { font-size: 16px; font-weight: 700; color: #4c4f69; }
-QLabel#subtitle { font-size: 12px; color: #7c7f93; }
-QLabel#muted { color: #8c8fa1; font-size: 12px; }
-QLabel#badge {
-    background: #e6e9ef;
-    color: #5c5f77;
-    border-radius: 8px;
-    padding: 2px 8px;
+/* --- typography ----------------------------------------------------------- */
+QLabel#title {{ font-size: 15px; font-weight: 700; color: {text}; }}
+QLabel#subtitle {{ font-size: 11.5px; color: {text_faint}; }}
+QLabel#cardTitle {{ font-size: 13.5px; font-weight: 650; color: {text}; }}
+QLabel#muted {{ color: {text_dim}; font-size: 12px; }}
+QLabel#meta {{ color: {text_faint}; font-size: 11px; }}
+QLabel#value {{ color: {text_dim}; font-size: 11px; font-weight: 600; }}
+QLabel#empty {{ color: {text_faint}; font-size: 12.5px; padding: 22px 8px; }}
+QLabel#badge {{
+    background: {surface_hi};
+    color: {text_dim};
+    border: 1px solid {border};
+    border-radius: 6px;
+    padding: 2px 7px;
     font-size: 11px;
-    font-weight: 600;
-}
-QLabel#cardTitle { font-size: 14.5px; font-weight: 600; color: #4c4f69; }
-QLabel { padding: 1px 0px; }
-
-QPushButton {
-    background: #ffffff;
-    color: #4c4f69;
-    border: 1px solid #ccd0da;
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 12.5px;
-    font-weight: 500;
-}
-QPushButton:hover { background: #e6e9ef; border-color: #bcc0cc; }
-QPushButton:pressed { background: #dce0ec; }
-QPushButton:disabled { background: #e6e9ef; color: #9ca0b0; }
-QPushButton#primary {
-    background: #1e66f5;
-    color: white;
-    border: none;
     font-weight: 700;
-    padding: 8px 16px;
-}
-QPushButton#primary:hover { background: #3369ff; }
-QPushButton#ghost { background: transparent; border: 1px solid #dce0ec; color: #7c7f93; }
-QPushButton#ghost:hover { background: #ffffff; }
+}}
+QLabel {{ background: transparent; }}
 
-QProgressBar {
-    background: #e6e9ef;
-    border: 1px solid #dce0ec;
+/* --- buttons -------------------------------------------------------------- */
+QPushButton {{
+    background: {surface_hi};
+    color: {text};
+    border: 1px solid {border};
     border-radius: 7px;
-    text-align: center;
-    font-size: 10.5px;
+    padding: 6px 12px;
+    font-size: 12px;
     font-weight: 600;
-    color: #4c4f69;
-    min-height: 14px;
-    max-height: 14px;
-}
-QProgressBar::chunk { background: #1e66f5; border-radius: 6px; margin: 1px; }
-QProgressBar#ram::chunk { background: #40a02b; }
-QProgressBar#disk::chunk { background: #df8e1d; }
+}}
+QPushButton:hover {{ background: {header}; border-color: {border_hi}; }}
+QPushButton:pressed {{ background: {surface}; }}
+QPushButton:disabled {{ color: {text_faint}; border-color: {border}; background: {surface}; }}
+QPushButton#primary {{
+    background: {accent};
+    color: {accent_ink};
+    border: 1px solid {accent};
+    font-weight: 700;
+    padding: 8px 14px;
+}}
+QPushButton#primary:hover {{ background: {accent}; border-color: {text_dim}; }}
+QPushButton#ghost {{ background: transparent; border: 1px solid {border}; color: {text_dim}; }}
+QPushButton#ghost:hover {{ background: {surface_hi}; color: {text}; }}
+QPushButton#chip {{
+    background: transparent;
+    border: 1px solid {border};
+    color: {text_dim};
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11.5px;
+    font-weight: 600;
+}}
+QPushButton#chip:hover {{ background: {surface_hi}; color: {text}; }}
+QPushButton#chip:checked {{ background: {accent}; color: {accent_ink}; border-color: {accent}; }}
 
-QTabWidget::pane { border: none; background: transparent; margin-top: 8px; }
-QTabBar::tab {
-    background: #ffffff;
-    color: #8c8fa1;
-    border: 1px solid #dce0ec;
+/* --- search --------------------------------------------------------------- */
+QLineEdit {{
+    background: {surface};
+    border: 1px solid {border};
     border-radius: 8px;
-    padding: 7px 14px;
-    margin-right: 6px;
+    padding: 6px 10px;
     font-size: 12.5px;
-    font-weight: 500;
-}
-QTabBar::tab:selected { background: #1e66f5; color: white; border-color: #1e66f5; }
-QTabBar::tab:hover { background: #e6e9ef; }
+    color: {text};
+    selection-background-color: {accent};
+    selection-color: {accent_ink};
+}}
+QLineEdit:focus {{ border-color: {accent}; }}
+QLineEdit::placeholder {{ color: {text_faint}; }}
+QFrame#searchBar {{ background: transparent; border: none; }}
 
-QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 2px 4px 0px; }
-QScrollBar::handle:vertical { background: #ccd0da; border-radius: 4px; min-height: 30px; }
-QScrollBar::handle:vertical:hover { background: #bcc0cc; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-QFrame#lineSep { background: #dce0ec; max-height: 1px; border: none; }
+/* --- progress ------------------------------------------------------------- */
+QProgressBar {{
+    background: {bar_track};
+    border: none;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: {text_dim};
+    min-height: 10px;
+    max-height: 10px;
+}}
+QProgressBar::chunk {{ background: {accent}; border-radius: 5px; }}
+QProgressBar#ram::chunk {{ background: {ok}; }}
+QProgressBar#disk::chunk {{ background: {warn}; }}
+QProgressBar#hot::chunk {{ background: {err}; }}
+QProgressBar#busy {{ min-height: 4px; max-height: 4px; border-radius: 2px; }}
+
+/* --- tabs ----------------------------------------------------------------- */
+QTabWidget::pane {{ border: none; background: transparent; margin-top: 6px; }}
+QTabBar {{ qproperty-drawBase: 0; }}
+QTabBar::tab {{
+    background: transparent;
+    color: {text_faint};
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 6px 11px;
+    margin-right: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}}
+QTabBar::tab:selected {{ background: {surface_hi}; color: {text}; border-color: {border_hi}; }}
+QTabBar::tab:hover:!selected {{ color: {text_dim}; background: {surface}; }}
+
+/* --- scroll --------------------------------------------------------------- */
+QScrollArea {{ background: transparent; border: none; }}
+QScrollBar:vertical {{ background: transparent; width: 9px; margin: 2px 0px 2px 0px; }}
+QScrollBar::handle:vertical {{ background: {border_hi}; border-radius: 4px; min-height: 28px; }}
+QScrollBar::handle:vertical:hover {{ background: {text_faint}; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+
+/* --- settings dialog ------------------------------------------------------ */
+QDialog {{ background: {bg}; }}
+QGroupBox {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 10px;
+    margin-top: 14px;
+    padding: 12px 12px 10px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: {text_dim};
+}}
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0px 6px;
+    color: {text_dim};
+}}
+QListWidget {{
+    background: {surface_hi};
+    border: 1px solid {border};
+    border-radius: 8px;
+    padding: 4px;
+    font-size: 12.5px;
+}}
+QListWidget::item {{ padding: 6px 8px; border-radius: 6px; }}
+QListWidget::item:selected {{ background: {accent}; color: {accent_ink}; }}
+QComboBox, QSpinBox {{
+    background: {surface_hi};
+    border: 1px solid {border};
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    color: {text};
+    min-height: 20px;
+}}
+QComboBox:focus, QSpinBox:focus {{ border-color: {accent}; }}
+QComboBox::drop-down {{ border: none; width: 22px; }}
+QComboBox::down-arrow {{ image: url({asset_chevron}); width: 11px; height: 11px; }}
+QSpinBox::up-button, QSpinBox::down-button {{
+    background: transparent;
+    border: none;
+    width: 18px;
+}}
+QSpinBox::up-arrow {{ image: url({asset_chevron_up}); width: 10px; height: 10px; }}
+QSpinBox::down-arrow {{ image: url({asset_chevron}); width: 10px; height: 10px; }}
+QComboBox QAbstractItemView {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 8px;
+    selection-background-color: {accent};
+    selection-color: {accent_ink};
+    padding: 4px;
+}}
+QCheckBox {{ background: transparent; font-size: 12.5px; color: {text_dim}; spacing: 8px; }}
+QCheckBox::indicator {{
+    width: 15px;
+    height: 15px;
+    border: 1px solid {border_hi};
+    border-radius: 4px;
+    background: {surface_hi};
+}}
+QCheckBox::indicator:checked {{
+    background: {accent};
+    border-color: {accent};
+    image: url({asset_check});
+}}
+QFormLayout QLabel {{ color: {text_dim}; }}
+
+/* --- misc ----------------------------------------------------------------- */
+QFrame#lineSep {{ background: {border}; max-height: 1px; border: none; }}
+QMenu {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 8px;
+    padding: 5px;
+}}
+QMenu::item {{ padding: 6px 16px 6px 12px; border-radius: 5px; color: {text}; }}
+QMenu::item:selected {{ background: {surface_hi}; }}
+QMenu::separator {{ height: 1px; background: {border}; margin: 4px 6px; }}
 """
+
+_QSS_CACHE: dict[str, str] = {}
+
+
+def _asset(name: str, color: str, size: int = 12) -> str:
+    """Render one icon to a PNG on disk — Qt stylesheets can only load glyphs by path."""
+    import tempfile
+
+    from proxmox_widget.ui import icons
+
+    slug = f"pw-{name}-{color.lstrip('#')}-{size}.png"
+    path = pathlib.Path(tempfile.gettempdir()) / slug
+    if not path.exists():
+        icons.pixmap(name, size, color, stroke=2.6, dpr=2.0).save(str(path), "PNG")
+    return path.as_posix()
+
+
+def _build(pal: dict[str, str]) -> str:
+    try:
+        assets = {
+            "asset_check": _asset("check", pal["accent_ink"], 12),
+            "asset_chevron": _asset("chevron_down", pal["text_dim"], 12),
+            "asset_chevron_up": _asset("chevron_up", pal["text_dim"], 12),
+        }
+    except Exception:  # no QGuiApplication yet — fall back to bare indicators
+        assets = {"asset_check": "", "asset_chevron": "", "asset_chevron_up": ""}
+    return _QSS_TEMPLATE.format(**pal, **assets)
+
+
+def palette_for(theme: str, system_is_dark: bool = True) -> dict[str, str]:
+    if theme == "dark":
+        return DARK
+    if theme == "light":
+        return LIGHT
+    return DARK if system_is_dark else LIGHT
 
 
 def qss_for(theme: str, system_is_dark: bool = True) -> str:
-    if theme == "dark":
-        return DARK_QSS
-    if theme == "light":
-        return LIGHT_QSS
-    return DARK_QSS if system_is_dark else LIGHT_QSS
+    key = theme if theme in ("dark", "light") else ("dark" if system_is_dark else "light")
+    cached = _QSS_CACHE.get(key)
+    if cached is None:
+        cached = _build(DARK if key == "dark" else LIGHT)
+        _QSS_CACHE[key] = cached
+    return cached
