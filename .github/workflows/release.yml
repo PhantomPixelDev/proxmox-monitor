@@ -79,8 +79,6 @@ jobs:
               --enable-plugin=pyside6 \
               --include-package=proxmox_widget \
               --include-data-dir=src/proxmox_widget/resources=resources \
-              --main \
-              --python-flag=-m \
               --windows-console-mode=disable \
               --windows-icon-from-ico=src/proxmox_widget/resources/app.ico \
               --output-dir=dist \
@@ -94,8 +92,6 @@ jobs:
                 --enable-plugin=pyside6 \
                 --include-package=proxmox_widget \
                 --include-data-dir=src/proxmox_widget/resources=resources \
-                --main \
-                --python-flag=-m \
                 --macos-create-app-bundle \
                 --macos-app-icon=src/proxmox_widget/resources/app.png \
                 --output-dir=dist \
@@ -106,8 +102,6 @@ jobs:
                 --enable-plugin=pyside6 \
                 --include-package=proxmox_widget \
                 --include-data-dir=src/proxmox_widget/resources=resources \
-                --main \
-                --python-flag=-m \
                 --output-dir=dist \
                 src/proxmox_widget/__main__.py
             else
@@ -117,8 +111,6 @@ jobs:
                 --enable-plugin=pyside6 \
                 --include-package=proxmox_widget \
                 --include-data-dir=src/proxmox_widget/resources=resources \
-                --main \
-                --python-flag=-m \
                 --output-dir=dist \
                 src/proxmox_widget/__main__.py
             fi
@@ -129,8 +121,6 @@ jobs:
               --enable-plugin=pyside6 \
               --include-package=proxmox_widget \
               --include-data-dir=src/proxmox_widget/resources=resources \
-              --main \
-              --python-flag=-m \
               --output-dir=dist \
               src/proxmox_widget/__main__.py
           fi
