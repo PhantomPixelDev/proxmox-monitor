@@ -221,16 +221,31 @@ class ProxmoxClient:
         async def _for_node(n: ProxmoxNode) -> tuple[list[QemuVm], list[LxcContainer], list[StorageStatus]]:
             if n.status != "online":
                 return [], [], []
+            vms: list[QemuVm] = []
+            cts: list[LxcContainer] = []
+            stor: list[StorageStatus] = []
             try:
-                vms, cts, stor = await asyncio.gather(
-                    self.fetch_qemu(n.node),
-                    self.fetch_lxc(n.node),
-                    self.fetch_storage(n.node),
-                )
-                return vms, cts, stor
+                vms = await self.fetch_qemu(n.node)
             except Exception as e:
-                logger.warning("node {} fetch failed: {}", n.node, e)
-                return [], [], []
+                logger.warning("node {} qemu failed: {}", n.node, e)
+            try:
+                cts = await self.fetch_lxc(n.node)
+            except Exception as e:
+                msg = str(e)
+                if "500" in msg or "Connection reset" in msg:
+                    logger.warning("node {} lxc 500 transient, retrying once", n.node)
+                    await asyncio.sleep(0.7)
+                    try:
+                        cts = await self.fetch_lxc(n.node)
+                    except Exception as e2:
+                        logger.warning("node {} lxc retry failed: {}", n.node, e2)
+                else:
+                    logger.warning("node {} lxc failed: {}", n.node, e)
+            try:
+                stor = await self.fetch_storage(n.node)
+            except Exception as e:
+                logger.warning("node {} storage failed: {}", n.node, e)
+            return vms, cts, stor
 
         results = await asyncio.gather(*[_for_node(n) for n in nodes])
         all_vms: list[QemuVm] = []
