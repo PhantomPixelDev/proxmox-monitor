@@ -289,7 +289,6 @@ class Dashboard(QWidget):
         lay = self.tab_dashboard.layout()
         assert isinstance(lay, QVBoxLayout)
         _, card_lay = self._card(lay)
-        dot = ICONS["online"] if h.online else ICONS["offline"]
         badge = "ONLINE" if h.online else "OFFLINE"
         color = "#2ecc71" if h.online else "#ff3b30"
         card_lay.addLayout(self._section_row(ICONS["cluster"], f"{h.cluster_name}", badge, color))
@@ -347,7 +346,6 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for n in h.nodes:
             _, cl = self._card(lay)
-            dot = ICONS["online"] if n.status == "online" else ICONS["offline"]
             color = "#2ecc71" if n.status == "online" else "#ff3b30"
             cl.addLayout(self._section_row(ICONS["node"], n.node, n.status.upper(), color))
             sub = QLabel(
