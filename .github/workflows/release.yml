@@ -160,7 +160,12 @@ jobs:
             ls -R dist || true
             exit 1
           fi
+          # Make SourceDir absolute for Inno (ISS is in scripts/, so relative dist/__main__.dist becomes scripts/dist/... which doesn't exist)
+          STANDALONE_DIR_ABS="$(pwd)/$STANDALONE_DIR"
+          STANDALONE_DIR_ABS_WIN="$(cygpath -w "$STANDALONE_DIR_ABS" 2>/dev/null || echo "$STANDALONE_DIR_ABS" | sed 's|/|\\|g')"
           echo "Standalone dir: $STANDALONE_DIR"
+          echo "Standalone dir abs: $STANDALONE_DIR_ABS"
+          echo "Standalone dir abs win: $STANDALONE_DIR_ABS_WIN"
           # Normalize exe name inside standalone dir for installer
           # Nuitka standalone main is __main__.exe on Windows
           if [[ -f "$STANDALONE_DIR/__main__.exe" && ! -f "$STANDALONE_DIR/ProxmoxWidget.exe" ]]; then
@@ -181,7 +186,10 @@ jobs:
           SETUP_EXE="dist/ProxmoxWidget-${TAG}-Windows-x64-Setup.exe"
           if command -v iscc >/dev/null 2>&1; then
             echo "iscc found — building installer"
-            MSYS_NO_PATHCONV=1 iscc "/DMyAppVersion=$TAG" "/DSourceDir=$STANDALONE_DIR" "/Odist" "/FProxmoxWidget-${TAG}-Windows-x64-Setup" scripts/innosetup.iss
+            echo "iscc SourceDir abs win: $STANDALONE_DIR_ABS_WIN"
+            ls -ld "$STANDALONE_DIR" || true
+            ls -lh "$STANDALONE_DIR/ProxmoxWidget.exe" 2>/dev/null || ls -lh "$STANDALONE_DIR/__main__.exe" 2>/dev/null || true
+            MSYS_NO_PATHCONV=1 iscc "/DMyAppVersion=$TAG" "/DSourceDir=$STANDALONE_DIR_ABS_WIN" "/Odist" "/FProxmoxWidget-${TAG}-Windows-x64-Setup" scripts/innosetup.iss
             ls -lh dist/*.exe || true
           else
             echo "iscc not available on this runner — skipping Setup.exe (fallback echo). Install Inno Setup to enable installer build."
