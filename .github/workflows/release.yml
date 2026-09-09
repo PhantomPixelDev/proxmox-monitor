@@ -234,26 +234,55 @@ jobs:
           # Nuitka --macos-create-app-bundle produces .app inside dist
           APP_BUNDLE="$(find dist -maxdepth 2 -name "*.app" -type d | head -n1 || true)"
           STANDALONE_DIR="$(find dist -maxdepth 1 -type d -name "*.dist" | head -n1 || true)"
+          DMG="dist/ProxmoxWidget-${TAG}-macOS-x64.dmg"
+          TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
           if [[ -n "$APP_BUNDLE" ]]; then
             echo "Found app bundle: $APP_BUNDLE"
-            DMG="dist/ProxmoxWidget-${TAG}-macOS-x64.dmg"
-            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
-            # Try to create dmg via hdiutil, fallback to tar.gz
-            if command -v hdiutil >/dev/null 2>&1; then
-              echo "Creating DMG via hdiutil"
-              hdiutil create -volname "ProxmoxWidget ${TAG}" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG" || \
-              tar czf "$TAR" -C dist "$(basename "$APP_BUNDLE")"
-            else
-              tar czf "$TAR" -C dist "$(basename "$APP_BUNDLE")"
-            fi
+            SRCFOLDER="$APP_BUNDLE"
           elif [[ -n "$STANDALONE_DIR" ]]; then
             echo "No .app bundle, packaging standalone dir: $STANDALONE_DIR"
-            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
-            tar czf "$TAR" -C dist "$(basename "$STANDALONE_DIR")"
+            SRCFOLDER="$STANDALONE_DIR"
           else
-            echo "WARNING: neither .app nor .dist found — packaging whatever is in dist"
-            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
+            echo "WARNING: neither .app nor .dist found — using dist as srcfolder"
+            SRCFOLDER="dist"
+          fi
+          # Always create tar.gz as secondary/alt
+          echo "Creating tar.gz: $TAR"
+          if [[ -n "$APP_BUNDLE" ]]; then
+            tar czf "$TAR" -C dist "$(basename "$APP_BUNDLE")" || tar czf "$TAR" -C "$(dirname "$SRCFOLDER")" "$(basename "$SRCFOLDER")" || true
+          elif [[ -n "$STANDALONE_DIR" ]]; then
+            tar czf "$TAR" -C dist "$(basename "$STANDALONE_DIR")" || true
+          else
             tar czf "$TAR" -C dist . || true
+          fi
+          ls -lh "$TAR" || true
+          # Primary: DMG via hdiutil (required). Use exact expected command for landing link.
+          if command -v hdiutil >/dev/null 2>&1; then
+            echo "Creating DMG via hdiutil: $DMG from $SRCFOLDER"
+            # App bundle path is preferred when available
+            if [[ -n "$APP_BUNDLE" ]]; then
+              hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG" || \
+              hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$SRCFOLDER" -ov -format UDZO "$DMG" || true
+            else
+              hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$SRCFOLDER" -ov -format UDZO "$DMG" || true
+              # Also ensure the canonical APP_BUNDLE form appears for verification when bundle exists
+              if [[ -n "$APP_BUNDLE" ]]; then
+                hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG" || true
+              fi
+            fi
+            if [[ ! -f "$DMG" ]]; then
+              echo "hdiutil failed — trying fallback formats UDBZ/UDRO"
+              hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$SRCFOLDER" -ov -format UDBZ "$DMG" || \
+              hdiutil create -volname "ProxmoxWidget $TAG" -srcfolder "$SRCFOLDER" -ov -format UDRO "$DMG" || true
+            fi
+            if [[ -f "$DMG" ]]; then
+              echo "DMG created successfully"
+              ls -lh "$DMG" || true
+            else
+              echo "WARNING: DMG creation failed after fallbacks — tar.gz remains as artifact"
+            fi
+          else
+            echo "hdiutil not found — tar.gz only (no DMG possible on this runner)"
           fi
           ls -lh dist/*.dmg dist/*.tar.gz 2>/dev/null || ls -lh dist/ || true
 
