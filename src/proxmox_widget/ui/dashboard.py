@@ -53,6 +53,7 @@ class Dashboard(QWidget):
         self.setMinimumHeight(560)
         self.setMaximumHeight(800)
         self._health: list[ClusterHealth] = []
+        self._busy: dict[tuple[str, int, bool], str] = {}
         self._build()
 
     def _build(self) -> None:
@@ -151,6 +152,18 @@ class Dashboard(QWidget):
         else:
             self.btn_open.setText("↗  Open Proxmox")
             self.btn_open.setEnabled(False)
+
+    def set_busy(self, cluster_id: str, vmid: int, is_lxc: bool, action: str | None) -> None:
+        key = (cluster_id, vmid, is_lxc)
+        if action is None:
+            self._busy.pop(key, None)
+        else:
+            self._busy[key] = action
+        self.update_health(self._health)
+
+    def clear_busy(self) -> None:
+        self._busy.clear()
+        self.update_health(self._health)
 
     def _placeholder_refresh(self) -> None:
         self.lbl_status.setText("Refreshing…")
@@ -296,6 +309,7 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for vm in h.vms:
             _, cl = self._card(lay)
+            busy = self._busy.get((h.cluster_id, vm.vmid, False))
             dot = ICONS["online"] if vm.status == "running" else ICONS["offline"] if vm.status == "stopped" else ICONS["paused"]
             head = QHBoxLayout()
             head.setSpacing(8)
@@ -303,17 +317,30 @@ class Dashboard(QWidget):
             lbl_name.setObjectName("cardTitle")
             lbl_name.setWordWrap(True)
             head.addWidget(lbl_name, 1)
+            if busy:
+                b = QLabel(f"⏳ {busy.upper()}")
+                b.setStyleSheet("background:#f9e2af; color:#1e1e2e; border-radius:8px; padding:2px 8px; font-size:10.5px; font-weight:700;")
+                b.setFixedWidth(88)
+                b.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                head.addWidget(b, 0)
             lbl_id = QLabel(f"#{vm.vmid}")
             lbl_id.setObjectName("badge")
             lbl_id.setFixedWidth(62)
             lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
             head.addWidget(lbl_id, 0)
             cl.addLayout(head)
+            if busy:
+                prog = QProgressBar()
+                prog.setRange(0, 0)
+                prog.setFixedHeight(6)
+                prog.setTextVisible(False)
+                cl.addWidget(prog)
             loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {vm.node}")
             loc.setObjectName("muted")
             cl.addWidget(loc)
-            status_color = "#2ecc71" if vm.status == "running" else "#ff3b30" if vm.status == "stopped" else "#f1c40f"
-            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{status_color}; font-weight:600;\">{vm.status}</span>' + ("  · template" if vm.template else "")))
+            status_color = "#f9e2af" if busy else ("#2ecc71" if vm.status == "running" else "#ff3b30" if vm.status == "stopped" else "#f1c40f")
+            status_txt = busy if busy else vm.status
+            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{status_color}; font-weight:600;\">{status_txt}</span>' + ("  · template" if vm.template else "")))
             cl.addWidget(self._kv(f"{ICONS['cpu']} vCPUs", str(vm.cpus)))
             if vm.status == "running":
                 for icon, label, used, total, oid in [(ICONS["cpu"], "CPU", vm.cpu, 1.0, ""), (ICONS["ram"], "RAM", vm.mem, vm.maxmem, "ram")]:
@@ -340,7 +367,7 @@ class Dashboard(QWidget):
             for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
                 b = QPushButton(label)
                 b.setFixedHeight(30)
-                b.setEnabled(vm.status != "unknown")
+                b.setEnabled(vm.status != "unknown" and not busy)
                 b.clicked.connect(lambda _=False, a=act, vm=vm: self.action_requested.emit(h.cluster_id, vm.node, vm.vmid, a, False))
                 row.addWidget(b, 1)
             cl.addLayout(row)
@@ -350,6 +377,7 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for ct in h.containers:
             _, cl = self._card(lay)
+            busy = self._busy.get((h.cluster_id, ct.vmid, True))
             dot = ICONS["online"] if ct.status == "running" else ICONS["offline"]
             head = QHBoxLayout()
             head.setSpacing(8)
@@ -357,17 +385,30 @@ class Dashboard(QWidget):
             lbl_name.setObjectName("cardTitle")
             lbl_name.setWordWrap(True)
             head.addWidget(lbl_name, 1)
+            if busy:
+                b = QLabel(f"⏳ {busy.upper()}")
+                b.setStyleSheet("background:#f9e2af; color:#1e1e2e; border-radius:8px; padding:2px 8px; font-size:10.5px; font-weight:700;")
+                b.setFixedWidth(88)
+                b.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                head.addWidget(b, 0)
             lbl_id = QLabel(f"#{ct.vmid}")
             lbl_id.setObjectName("badge")
             lbl_id.setFixedWidth(62)
             lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
             head.addWidget(lbl_id, 0)
             cl.addLayout(head)
+            if busy:
+                prog = QProgressBar()
+                prog.setRange(0, 0)
+                prog.setFixedHeight(6)
+                prog.setTextVisible(False)
+                cl.addWidget(prog)
             loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {ct.node}")
             loc.setObjectName("muted")
             cl.addWidget(loc)
-            color = "#2ecc71" if ct.status == "running" else "#ff3b30"
-            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{color}; font-weight:600;\">{ct.status}</span>'))
+            color = "#f9e2af" if busy else ("#2ecc71" if ct.status == "running" else "#ff3b30")
+            status_txt = busy if busy else ct.status
+            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{color}; font-weight:600;\">{status_txt}</span>'))
             if ct.status == "running":
                 for icon, label, used, total, oid in [(ICONS["cpu"], "CPU", ct.cpu, 1.0, ""), (ICONS["ram"], "RAM", ct.mem, ct.maxmem, "ram")]:
                     pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
@@ -392,6 +433,7 @@ class Dashboard(QWidget):
             for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
                 b = QPushButton(label)
                 b.setFixedHeight(30)
+                b.setEnabled(not busy)
                 b.clicked.connect(lambda _=False, a=act, ct=ct: self.action_requested.emit(h.cluster_id, ct.node, ct.vmid, a, True))
                 row.addWidget(b, 1)
             cl.addLayout(row)

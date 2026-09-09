@@ -275,3 +275,28 @@ class ProxmoxClient:
             return str(data)
         except Exception as e:
             raise ActionFailedError(f"action {action} failed for {vmid} on {node}: {e}") from e
+
+    async def get_guest_status(self, node: str, vmid: int, is_lxc: bool = False) -> str:
+        kind = "lxc" if is_lxc else "qemu"
+        try:
+            data = await self._get(f"/nodes/{node}/{kind}/{vmid}/status/current")
+            return str(data.get("status", "unknown")) if isinstance(data, dict) else "unknown"
+        except Exception:
+            return "unknown"
+
+    async def get_task_status(self, node: str, upid: str) -> str:
+        try:
+            data = await self._get(f"/nodes/{node}/tasks/{upid}/status")
+            return str(data.get("status", "unknown")) if isinstance(data, dict) else "unknown"
+        except Exception:
+            return "unknown"
+
+    async def wait_for_guest(self, node: str, vmid: int, want: str, is_lxc: bool = False, timeout: float = 45.0) -> bool:
+        deadline = asyncio.get_event_loop().time() + timeout
+        want = want.lower()
+        while asyncio.get_event_loop().time() < deadline:
+            cur = await self.get_guest_status(node, vmid, is_lxc=is_lxc)
+            if cur.lower() == want:
+                return True
+            await asyncio.sleep(1.0)
+        return False

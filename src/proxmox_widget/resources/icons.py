@@ -50,7 +50,9 @@ def make_app_icon(size: int = 256) -> QIcon:
         p.setBrush(QBrush(QColor("#2ecc71") if i != 2 else QColor("#f1c40f")))
         p.drawEllipse(int(cx + w // 2 - h // 2 - 6), int(y + h // 2 - 4), 8, 8)
         # vent lines
-        p.setPen(QPen(QColor("#1e1e2e", 60), 1))
+        c = QColor("#1e1e2e")
+        c.setAlpha(60)
+        p.setPen(QPen(c, 1))
         for vx in range(3):
             lx = int(cx - w // 2 + 18 + vx * 18)
             p.drawLine(lx, int(y + 5), lx, int(y + h - 5))

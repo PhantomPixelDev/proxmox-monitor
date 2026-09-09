@@ -159,24 +159,44 @@ class ProxmoxWidgetApp:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
         if not cluster:
             return
-        # map reboot -> reboot, stop -> stop, etc. Proxmox uses shutdown/stop/reboot/start
         proxmox_action = {"start": "start", "stop": "stop", "reboot": "reboot", "shutdown": "shutdown"}.get(action, action)
+        want_map = {"start": "running", "stop": "stopped", "shutdown": "stopped", "reboot": "running"}
+        want = want_map.get(proxmox_action, "running")
+
+        self.dashboard.set_busy(cluster_id, vmid, is_lxc, proxmox_action)
+        self.tray.tray.showMessage("ProxmoxWidget", f"{proxmox_action} {vmid} on {node}…", QSystemTrayIcon.MessageIcon.Information, 2000)
 
         async def _do() -> None:
             client = ProxmoxClient(cluster)
             try:
                 upid = await client.vm_action(node, vmid, proxmox_action, is_lxc=is_lxc)
-                self.tray.tray.showMessage("ProxmoxWidget", f"{action} {vmid} → {upid}", QSystemTrayIcon.MessageIcon.Information, 3000)
+                logger.info("action {} {} -> {}", proxmox_action, vmid, upid)
+                self.tray.tray.showMessage("ProxmoxWidget", f"{proxmox_action} sent → waiting for {want}…", QSystemTrayIcon.MessageIcon.Information, 2500)
+                ok = await client.wait_for_guest(node, vmid, want, is_lxc=is_lxc, timeout=45)
+                if ok:
+                    self.tray.tray.showMessage("ProxmoxWidget ✓", f"{vmid} is now {want}", QSystemTrayIcon.MessageIcon.Information, 3000)
+                else:
+                    full = await client.get_guest_status(node, vmid, is_lxc=is_lxc)
+                    self.tray.tray.showMessage("ProxmoxWidget", f"{vmid} status: {full} (want {want})", QSystemTrayIcon.MessageIcon.Warning, 4000)
             except Exception as e:
-                self.tray.tray.showMessage("ProxmoxWidget — failed", str(e), QSystemTrayIcon.MessageIcon.Critical, 4000)
-            await self._fetch_all()
+                logger.error("action failed: {}", e)
+                self.tray.tray.showMessage("ProxmoxWidget — failed", str(e)[:220], QSystemTrayIcon.MessageIcon.Critical, 5000)
+            finally:
+                self.dashboard.set_busy(cluster_id, vmid, is_lxc, None)
+                for _ in range(3):
+                    await self._fetch_all()
+                    await asyncio.sleep(1.0)
+                await self._fetch_all()
 
-        try:
-            asyncio.run(_do())
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(_do())
+        def _run() -> None:
+            try:
+                asyncio.run(_do())
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(_do())
+
+        QTimer.singleShot(0, _run)
 
 
 def create_app(argv: list[str] | None = None) -> tuple[QApplication, ProxmoxWidgetApp]:
