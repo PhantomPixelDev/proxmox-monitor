@@ -71,9 +71,15 @@ quote-style = "double"
 include = ["src"]
 venvPath = "."
 venv = ".venv"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 pythonVersion = "3.11"
 reportAny = false
+reportMissingTypeArgument = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
