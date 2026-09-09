@@ -9,7 +9,6 @@
   <a href="https://github.com/PhantomPixelDev/proxmox-monitor/actions/workflows/ci.yml?branch=master"><img src="https://img.shields.io/github/actions/workflow/status/PhantomPixelDev/proxmox-monitor/ci.yml?branch=master&label=build" alt="Build status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/PhantomPixelDev/proxmox-monitor?color=89b4fa" alt="MIT license" /></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11 plus" /></a>
-  <a href="https://pypi.org/project/proxmox-widget/"><img src="https://img.shields.io/pypi/dm/proxmox-widget?label=downloads&color=e85d04" alt="PyPI downloads" /></a>
   <a href="https://doc.qt.io/qtforpython/"><img src="https://img.shields.io/badge/PySide6-Qt6-41CD52?logo=qt&logoColor=white" alt="PySide6 Qt6" /></a>
 </p>
 
@@ -79,11 +78,9 @@ First launch puts an icon in your tray. If you don't see it, check overflow or t
 
 ## Screenshots
 
-<p align="center"><img src="docs/screenshots/dashboard.png?v=hero" width="440" alt="ProxmoxWidget on Windows - live pve-01 dashboard" /></p>
+<p align="center"><img src="docs/screenshots/dashboard.png?v=hero" width="440" alt="ProxmoxWidget on Windows — live dashboard" /></p>
 
-<p align="center"><sub>ProxmoxWidget on Windows - live pve-01 dashboard (440×573, 23 KB, window frame). Single hero keeps the README fast.</sub></p>
-
-See [docs/screenshots/README.md](docs/screenshots/README.md) for capture notes.
+<p align="center"><sub>Live dashboard</sub></p>
 
 ---
 
@@ -289,13 +286,14 @@ In the platform config dir via `platformdirs` and secrets in the OS keyring. Uni
 For Python users or contributors. Normal users should use Download above.
 
 ```bash
-# isolated, recommended if you use Python
-pipx install proxmox-widget
+# from source, isolated
+pipx install git+https://github.com/PhantomPixelDev/proxmox-monitor.git
 proxmox-widget
 
-# or with pip
-pip install proxmox-widget
-proxmox-widget
+# or local clone
+git clone https://github.com/PhantomPixelDev/proxmox-monitor.git
+cd proxmox-monitor
+pipx install .
 
 # no console on Windows
 pythonw -m proxmox_widget
@@ -308,11 +306,9 @@ Update later:
 
 ```bash
 pipx upgrade proxmox-widget
-# or
-pip install -U proxmox-widget
+# or reinstall from source
+pipx install --force git+https://github.com/PhantomPixelDev/proxmox-monitor.git
 ```
-
-Available at [pypi.org/project/proxmox-widget](https://pypi.org/project/proxmox-widget/) - package stays `proxmox-widget` on PyPI while the repo lives at `PhantomPixelDev/proxmox-monitor`.
 
 ---
 
