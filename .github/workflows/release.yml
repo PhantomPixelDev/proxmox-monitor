@@ -74,20 +74,19 @@ jobs:
         run: |
           set -euo pipefail
           echo "Building ${{ matrix.artifact-name }} -> ${{ matrix.output-file }}"
-          # Ordered flags exactly as required by spec:
-          # --standalone --onefile --enable-plugin=pyside6 --windows-console-mode=disable --windows-icon-from-ico=... --include-data-dir=...
           EXTRA="${{ matrix.nuitka-extra }}"
           python -m nuitka \
             --standalone \
             --onefile \
             --enable-plugin=pyside6 \
             --include-data-dir=src/proxmox_widget/resources=resources \
+            --include-package=proxmox_widget \
             ${EXTRA} \
             --output-filename=${{ matrix.output-file }} \
             --output-dir=dist \
-            src/proxmox_widget/__main__.py
+            --main=src/proxmox_widget/__main__.py \
+            --python-flag=-m
           ls -lh dist/
-          # Move to dist artifact location and also copy to root for checksum job if needed
           echo "Build done: dist/${{ matrix.output-file }}"
 
       - name: Generate SHA256
