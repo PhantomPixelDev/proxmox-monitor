@@ -3,142 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ProxmoxWidget — Proxmox VE Desktop Client (Tray)</title>
-<meta name="description" content="ProxmoxWidget is a lightweight Proxmox VE desktop client that lives in the system tray — live nodes, VMs, LXC and storage health for homelabs. Download for Windows, Linux and macOS.">
-<meta name="keywords" content="proxmox,pve,proxmox-ve,pve-monitoring,system-tray,tray-app,desktop-client,pyside6,qt6,homelab,vm-management,lxc">
-<meta name="author" content="PhantomPixelDev">
+<title>ProxmoxWidget — See your Proxmox servers from the tray</title>
+<meta name="description" content="ProxmoxWidget lives in your system tray and shows your Proxmox servers at a glance — nodes, VMs, storage. No browser needed. For Windows, Linux and macOS.">
 <meta name="theme-color" content="#ff7b00">
-<meta property="og:title" content="ProxmoxWidget — Proxmox VE Desktop Client (Tray)">
-<meta property="og:description" content="Live infrastructure at a glance. Tray app for Proxmox VE — nodes, VMs, LXC, storage without opening the browser.">
+<meta property="og:title" content="ProxmoxWidget — See your Proxmox servers from the tray">
+<meta property="og:description" content="Download → Install → Add your Proxmox → See your servers. Lightweight tray app for homelabs.">
 <meta property="og:image" content="screenshots/dashboard.png">
 <meta property="og:type" content="website">
-<link rel="icon" href="../src/proxmox_widget/resources/app.png">
+<link rel="icon" href="app.png" type="image/png">
+<link rel="apple-touch-icon" href="app.png">
 <style>
-:root{--o1:#ff7b00;--o2:#e85d04;--o3:#9d0208;--bg:#0f0f12;--card:#ffffff;--muted:#6b7280;--ring:rgba(255,123,0,.35);--radius:20px}
+:root{--o1:#ff7b00;--o2:#e85d04;--o3:#9d0208;--bg:#0f0f12;--card:#ffffff;--muted:#6b7280;--text:#111827;--radius:20px}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--o1) 0%,var(--o2) 55%,var(--o3) 100%);min-height:100vh;color:#111827;-webkit-font-smoothing:antialiased}
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--o1) 0%,var(--o2) 55%,var(--o3) 100%);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:16px;line-height:1.65}
 a{color:inherit}
 .wrap{padding:32px 16px}
 .card{max-width:860px;margin:0 auto;background:var(--card);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.15);overflow:hidden;border:1px solid rgba(255,255,255,.6)}
-.header{padding:28px 28px 0 28px;display:flex;gap:16px;align-items:center}
-.app-icon{width:56px;height:56px;flex:0 0 56px;border-radius:14px;background:linear-gradient(135deg,var(--o1),var(--o2) 55%,var(--o3));display:grid;place-items:center;box-shadow:0 8px 18px rgba(232,93,4,.45);overflow:hidden}
-.app-icon img{width:56px;height:56px;border-radius:14px;object-fit:cover;display:block}
-.header h1{margin:0;font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.02em}
-.header p{margin:6px 0 0 0;color:var(--muted);font-size:14px;line-height:1.5}
-.badges{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
+.header{padding:28px 28px 0 28px;display:flex;gap:18px;align-items:center}
+.app-icon{width:64px;height:64px;flex:0 0 64px;border-radius:16px;background:linear-gradient(135deg,var(--o1),var(--o2) 55%,var(--o3));display:grid;place-items:center;box-shadow:0 8px 18px rgba(232,93,4,.45);overflow:hidden}
+.app-icon img{width:64px;height:64px;border-radius:16px;object-fit:cover;display:block}
+.header h1{margin:0;font-size:24px;line-height:1.2;font-weight:800;letter-spacing:-.02em}
+.header p{margin:8px 0 0 0;color:#374151;font-size:16px;line-height:1.6}
+.header .tagline{margin:10px 0 0 0;color:var(--muted);font-size:14px}
+.badges{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
 .badge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:#111827;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700}
 .badge.orange{background:linear-gradient(135deg,var(--o1),var(--o2));color:#fff}
-.hero{padding:20px 28px 8px 28px;text-align:center}
+.hero{padding:22px 28px 8px 28px;text-align:center}
 .hero-frame{background:linear-gradient(180deg,#fff 0%,#fff7ed 100%);border:1px solid #ffe4cc;border-radius:16px;padding:12px;box-shadow:0 10px 30px rgba(255,123,0,.12) inset}
 .hero-frame img{width:440px;max-width:100%;height:auto;border-radius:12px;border:1px solid #ffedd5;display:block;margin:0 auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-.hero-caption{margin:10px 0 0 0;color:var(--muted);font-size:12px}
-.section{padding:22px 28px}
-.section h2{margin:0 0 12px 0;font-size:16px;letter-spacing:-.01em}
-.lead{color:#374151;font-size:14px;line-height:1.6;margin:0}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.hero-caption{margin:10px 0 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.section{padding:28px}
+.section h2{margin:0 0 10px 0;font-size:19px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.section h2 .ico{font-size:20px}
+.lead{color:#374151;font-size:16px;line-height:1.65;margin:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
 @media(max-width:640px){.grid{grid-template-columns:1fr}.header{flex-direction:column;align-items:flex-start}}
-.btn{display:flex;flex-direction:column;gap:4px;text-decoration:none;border-radius:14px;padding:14px 16px;border:1px solid #e5e7eb;background:#fff;color:#111827;transition:transform .08s ease,box-shadow .15s ease,border-color .15s ease;position:relative}
+.btn{display:flex;flex-direction:column;gap:4px;text-decoration:none;border-radius:14px;padding:16px 16px;border:1px solid #e5e7eb;background:#fff;color:#111827;transition:transform .08s ease,box-shadow .15s ease,border-color .15s ease;position:relative}
 .btn:hover{transform:translateY(-1px);box-shadow:0 10px 20px rgba(0,0,0,.08);border-color:#fed7aa}
 .btn:active{transform:translateY(0)}
-.btn small{color:var(--muted);font-size:11px;letter-spacing:.02em}
-.btn strong{font-size:14px;line-height:1.2}
+.btn small{color:var(--muted);font-size:12px;letter-spacing:.01em;line-height:1.4}
+.btn strong{font-size:15px;line-height:1.3;display:flex;align-items:center;gap:8px}
+.btn strong .dl-ico{font-size:18px}
 .btn-primary{background:linear-gradient(135deg,var(--o1) 0%,var(--o2) 60%,var(--o3) 100%);color:#fff;border-color:transparent;box-shadow:0 10px 22px rgba(232,93,4,.35)}
-.btn-primary small{color:rgba(255,255,255,.9)}
+.btn-primary small{color:rgba(255,255,255,.92)}
 .btn-primary:hover{box-shadow:0 14px 28px rgba(232,93,4,.45)}
-.ghost{margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:#374151}
+.ghost{margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:14px;color:#374151}
 .ghost a{color:#9d0208;text-decoration:none;border-bottom:1px dashed #ffb889;padding-bottom:1px}
 .ghost a:hover{color:var(--o2);border-bottom-style:solid}
-.meta{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.6}
-.kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#111827;color:#fff;padding:2px 6px;border-radius:6px;font-size:11px}
-.features{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px}
-@media(max-width:720px){.features{grid-template-columns:1fr}}
-.feat{background:#fff7ed;border:1px solid #ffedd5;border-radius:14px;padding:14px}
-.feat h3{margin:0 0 6px 0;font-size:13px}
-.feat p{margin:0;color:#6b7280;font-size:12px;line-height:1.5}
-.footer{padding:18px 28px;background:#fff7ed;border-top:1px solid #ffedd5;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;color:#6b7280;font-size:12px}
+.meta{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.6}
+.features{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+@media(max-width:680px){.features{grid-template-columns:1fr}}
+.feat{background:#fff7ed;border:1px solid #ffedd5;border-radius:14px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+.feat .ficon{font-size:22px;flex:0 0 28px;text-align:center;line-height:1}
+.feat h3{margin:0 0 4px 0;font-size:14px}
+.feat p{margin:0;color:#6b7280;font-size:13px;line-height:1.55}
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px}
+@media(max-width:680px){.steps{grid-template-columns:1fr}}
+.step{background:#fff;border:1px solid #ffedd5;border-radius:14px;padding:18px;text-align:center}
+.step .sico{font-size:28px;display:block;margin-bottom:8px}
+.step h3{margin:0 0 6px 0;font-size:14px}
+.step p{margin:0;color:#6b7280;font-size:13px;line-height:1.6}
+.troubles{margin-top:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px}
+.troubles h3{margin:0 0 10px 0;font-size:14px;display:flex;align-items:center;gap:8px}
+.troubles ul{margin:0;padding-left:18px;color:#374151;font-size:14px;line-height:1.7}
+.troubles li{margin:6px 0}
+.troubles li strong{color:#111827}
+.footer{padding:18px 28px;background:#fff7ed;border-top:1px solid #ffedd5;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;color:#6b7280;font-size:13px}
 .footer a{color:#9d0208;text-decoration:none;font-weight:600}
 .footer a:hover{text-decoration:underline}
+.footer .foot-ico{font-size:16px}
 .hr{height:1px;background:#f3f4f6;margin:0 28px}
-.note{background:#111827;color:#e5e7eb;border-radius:12px;padding:14px 16px;font-size:12px;line-height:1.6;margin-top:14px}
-.note a{color:#fdba74}
+.kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#111827;color:#fff;padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all}
 </style>
 </head>
 <body>
 <div class="wrap">
 <main class="card" role="main">
 <div class="header">
-<div class="app-icon" aria-hidden="true"><img src="../src/proxmox_widget/resources/app.png" width="56" height="56" alt="ProxmoxWidget app icon — orange server stack" onerror="this.style.display='none';this.parentElement.textContent='P';this.parentElement.style.color='#fff';this.parentElement.style.fontWeight='800';this.parentElement.style.fontSize='22px'"></div>
+<div class="app-icon" aria-hidden="true"><img src="app.png" width="64" height="64" alt="ProxmoxWidget app icon — orange server stack"></div>
 <div>
-<h1>ProxmoxWidget — Proxmox VE Desktop Client (Tray)</h1>
-<p>Live infrastructure at a glance. A lightweight tray app for Proxmox VE that shows nodes, VMs, LXC and storage without opening the browser. Works on Windows, Linux and macOS.</p>
-<div class="badges"><span class="badge orange">v0.1.10</span><span class="badge">Windows • Linux • macOS</span><span class="badge">PySide6 Qt6</span></div>
+<h1>ProxmoxWidget</h1>
+<p>See your Proxmox servers from the tray.</p>
+<p class="tagline">🖥️ Live nodes, VMs &amp; storage at a glance — no browser tab needed.</p>
+<div class="badges"><span class="badge orange">v0.1.10</span><span class="badge">🪟 Windows • 🐧 Linux • 🍎 macOS</span></div>
 </div>
 </div>
 
 <div class="hero">
 <div class="hero-frame">
-<img src="screenshots/dashboard.png" width="440" height="573" alt="ProxmoxWidget on Windows — live pve-01 dashboard with CPU RAM bars and VM list, 440px hero" loading="eager" decoding="async">
+<img src="screenshots/dashboard.png" width="440" height="573" alt="ProxmoxWidget dashboard — live server overview with CPU, RAM and VM list" loading="eager" decoding="async">
 </div>
-<p class="hero-caption">ProxmoxWidget on Windows — live pve-01 dashboard (440×573, window frame). Single hero keeps the page fast. See <a href="https://github.com/PhantomPixelDev/proxmox-monitor">GitHub</a> for source.</p>
+<p class="hero-caption">💡 What you see is what you get — real dashboard from the app. One click to open Proxmox in your browser.</p>
 </div>
 
 <div class="section">
-<h2>Download — no Python needed</h2>
-<p class="lead">Grab a ready-to-run build from GitHub Releases. Installer for Windows, portable ZIP, Linux tar.gz and macOS tar.gz. Every file is checksummed with <span class="kbd">SHA256SUMS.txt</span>.</p>
+<h2><span class="ico">⬇️</span> Download — no setup needed</h2>
+<p class="lead">Just download, install, and run. No Python, no commands. Pick your system:</p>
 <div class="grid" role="list">
-<a class="btn btn-primary" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Windows-x64-Setup.exe" aria-label="Download Windows installer ProxmoxWidget-0.1.10-Windows-x64-Setup.exe">
-<strong>Windows Installer</strong>
-<small>ProxmoxWidget-0.1.10-Windows-x64-Setup.exe — double-click setup</small>
-<small>Windows 10/11 x64 • Installer</small>
+<a class="btn btn-primary" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Windows-x64-Setup.exe" aria-label="Download Windows installer">
+<strong><span class="dl-ico">⬇️</span> 🪟 Windows Installer</strong>
+<small>ProxmoxWidget-0.1.10-Windows-x64-Setup.exe</small>
+<small>Double-click to install • Windows 10/11</small>
 </a>
-<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Windows-x64-Portable.zip" aria-label="Download Windows portable ProxmoxWidget-0.1.10-Windows-x64-Portable.zip">
-<strong>Windows Portable</strong>
-<small>ProxmoxWidget-0.1.10-Windows-x64-Portable.zip — unzip &amp; run</small>
-<small>ProxmoxWidget.exe • no install</small>
+<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Windows-x64-Portable.zip" aria-label="Download Windows portable">
+<strong><span class="dl-ico">📦</span> 🪟 Windows Portable</strong>
+<small>ProxmoxWidget-0.1.10-Windows-x64-Portable.zip</small>
+<small>Unzip &amp; run • No install needed</small>
 </a>
-<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Linux-x64.tar.gz" aria-label="Download Linux build ProxmoxWidget-0.1.10-Linux-x64.tar.gz">
-<strong>Linux</strong>
-<small>ProxmoxWidget-0.1.10-Linux-x64.tar.gz — extract &amp; run</small>
-<small>Linux x64 • tar.gz</small>
+<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-Linux-x64.tar.gz" aria-label="Download Linux">
+<strong><span class="dl-ico">⬇️</span> 🐧 Linux</strong>
+<small>ProxmoxWidget-0.1.10-Linux-x64.tar.gz</small>
+<small>Extract &amp; run ProxmoxWidget</small>
 </a>
-<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-macOS-x64.tar.gz" aria-label="Download macOS build ProxmoxWidget-0.1.10-macOS-x64.tar.gz">
-<strong>macOS</strong>
-<small>ProxmoxWidget-0.1.10-macOS-x64.tar.gz — fallback tarball</small>
-<small>macOS x64 • also .dmg on releases</small>
+<a class="btn" role="listitem" href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-macOS-x64.tar.gz" aria-label="Download macOS">
+<strong><span class="dl-ico">⬇️</span> 🍎 macOS</strong>
+<small>ProxmoxWidget-0.1.10-macOS-x64.tar.gz</small>
+<small>Also available as .dmg — see below</small>
 </a>
 </div>
 <div class="ghost">
-<a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">Latest release (latest)</a>
+<span>💚 <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">Latest release</a></span>
 <span aria-hidden="true">•</span>
-<a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/SHA256SUMS.txt">SHA256SUMS.txt for v0.1.10</a>
+<span>🔐 <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/SHA256SUMS.txt">SHA256 checksums</a></span>
 <span aria-hidden="true">•</span>
-<a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases">All releases on GitHub</a>
+<span>📦 <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases">All releases on GitHub</a></span>
 <span aria-hidden="true">•</span>
-<a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-macOS-x64.dmg">macOS .dmg (v0.1.10)</a>
+<span>🍎 <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/download/v0.1.10/ProxmoxWidget-0.1.10-macOS-x64.dmg">macOS .dmg</a></span>
 </div>
-<p class="meta">Versioned links pin to <strong>v0.1.10</strong>. Use <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">releases/latest</a> for the newest build if you link externally. Verify with <span class="kbd">SHA256SUMS.txt</span> — each asset has a matching <span class="kbd">.sha256</span>.</p>
-<div class="note">Quick start: download, run, find the tray icon (Windows hidden overflow / macOS menu bar), right-click → Settings → Add Cluster <span class="kbd">your.host.example:8006</span> with token <span class="kbd">PVEAPIToken=widget@pve!monitor=…</span>. See README for least-privilege setup.</div>
+<p class="meta">Links above are pinned to <strong>v0.1.10</strong>. Want the newest? Use <a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest" style="color:#9d0208;font-weight:600">releases/latest</a>. Every file can be verified with <span class="kbd">SHA256SUMS.txt</span>.</p>
 </div>
 
 <div class="hr"></div>
 
 <div class="section">
-<h2>Why ProxmoxWidget</h2>
+<h2><span class="ico">✨</span> What you get</h2>
+<p class="lead">A tiny app that lives in your tray and keeps an eye on your homelab.</p>
 <div class="features">
-<div class="feat"><h3>Multi-cluster tray</h3><p>Add many host:port endpoints, totals roll up in the header tooltip. One click to Open Proxmox in browser.</p></div>
-<div class="feat"><h3>Least-privilege tokens</h3><p>Uses PVEAPIToken, never root password. PVEAuditor + VM.Audit, optional VM.PowerMgmt. Stored in OS keyring.</p></div>
-<div class="feat"><h3>Live &amp; reliable</h3><p>Auto-refresh, WAIT state polling, OFFLINE badge instantly. In-app banner, no popup spam. pythonw quiet on Windows.</p></div>
+<div class="feat"><span class="ficon">🏢</span><div><h3>All clusters in one place</h3><p>Add several Proxmox servers — see totals for everything at a glance.</p></div></div>
+<div class="feat"><span class="ficon">🔐</span><div><h3>Safe login with tokens</h3><p>Uses a Proxmox API token, never your password. Stored securely in your system.</p></div></div>
+<div class="feat"><span class="ficon">⏳</span><div><h3>Live updates</h3><p>Auto-refreshes every 30 seconds. Starting or stopping a VM shows a clear busy state.</p></div></div>
+<div class="feat"><span class="ficon">🖥️</span><div><h3>Tray &amp; menu bar</h3><p>Click to open the dashboard, right-click for quick actions. Tooltip shows running VMs.</p></div></div>
+<div class="feat"><span class="ficon">💾</span><div><h3>Storage at a glance</h3><p>See disks, usage bars and free space for every storage — shared or local.</p></div></div>
+<div class="feat"><span class="ficon">🌙</span><div><h3>Light, Dark &amp; System</h3><p>Matches your computer's theme. No restart needed.</p></div></div>
 </div>
-<p class="meta" style="margin-top:14px">Palette from <code>src/proxmox_widget/resources/icons.py</code> — gradient <span class="kbd">#ff7b00 → #e85d04 → #9d0208</span>, card max-width 860, radius 20, hero 440, Inter/Segoe. Single-file, no external deps, inline CSS for GitHub Pages (master/docs).</p>
+</div>
+
+<div class="hr"></div>
+
+<div class="section">
+<h2><span class="ico">🚀</span> How to use — 3 easy steps</h2>
+<p class="lead">Download → Install → Add your Proxmox → See your servers.</p>
+<div class="steps">
+<div class="step"><span class="sico">1️⃣</span><h3>Download &amp; run</h3><p>Pick your download above. Install or just unzip and double-click.</p></div>
+<div class="step"><span class="sico">2️⃣</span><h3>Add your Proxmox</h3><p>Find the tray icon → Right-click → Settings → Add Cluster. Enter your host <span class="kbd">your.server:8006</span> and API token.</p></div>
+<div class="step"><span class="sico">3️⃣</span><h3>See your servers</h3><p>Done! Your nodes, VMs and storage appear live. Click <em>Open Proxmox</em> to jump to the web UI.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">💡 API token tip: In Proxmox go to Datacenter → Access → API Tokens → Add. Create <span class="kbd">widget@pve!monitor</span>, copy the secret once, paste as <span class="kbd">PVEAPIToken=widget@pve!monitor=secret</span> in the app.</p>
+</div>
+
+<div class="hr"></div>
+
+<div class="section" style="padding-top:22px;padding-bottom:22px">
+<div class="troubles">
+<h3>🛠️ Troubleshooting — 3 quick fixes</h3>
+<ul>
+<li><strong>🔴 Shows OFFLINE right after adding?</strong> Check host, port and token for typos. Try opening <span class="kbd">https://your.server:8006</span> in your browser first.</li>
+<li><strong>🔒 Start/Stop says Forbidden (403)?</strong> Your token needs VM power permission. Add <span class="kbd">VM.PowerMgmt</span> for that token in Proxmox → Permissions.</li>
+<li><strong>🔍 Can't find the tray icon?</strong> On Windows check the hidden icons arrow ▲ near the clock. On Mac look in the top menu bar. Still missing? Close and reopen the app.</li>
+</ul>
+</div>
 </div>
 
 <div class="footer">
-<span>© 2026 PhantomPixelDev • <a href="https://github.com/PhantomPixelDev/proxmox-monitor">PhantomPixelDev/proxmox-monitor</a> • MIT</span>
-<span><a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">Releases</a> • <a href="https://github.com/PhantomPixelDev/proxmox-monitor/blob/master/README.md">Docs</a> • <a href="https://pypi.org/project/proxmox-widget/">PyPI</a></span>
+<span><span class="foot-ico">🧡</span> © 2026 PhantomPixelDev • <a href="https://github.com/PhantomPixelDev/proxmox-monitor">GitHub</a> • MIT</span>
+<span><a href="https://github.com/PhantomPixelDev/proxmox-monitor/releases/latest">⬇️ Releases</a> • <a href="https://github.com/PhantomPixelDev/proxmox-monitor/blob/master/README.md">📖 Docs</a> • <span class="foot-ico">💾</span> <a href="https://github.com/PhantomPixelDev/proxmox-monitor">⭐ Star on GitHub</a></span>
 </div>
 </main>
-<p style="text-align:center;color:rgba(255,255,255,.9);font-size:11px;margin:14px 0 0 0;text-shadow:0 1px 6px rgba(0,0,0,.25)">Hosted via GitHub Pages • master/docs • https://phantompixeldev.github.io/proxmox-monitor/ • Not affiliated with Proxmox Server Solutions GmbH</p>
+<p style="text-align:center;color:rgba(255,255,255,.9);font-size:12px;margin:14px 0 0 0;text-shadow:0 1px 6px rgba(0,0,0,.25)">Hosted via GitHub Pages • https://phantompixeldev.github.io/proxmox-monitor/ • 🧡 Not affiliated with Proxmox Server Solutions GmbH</p>
 </div>
 </body>
 </html>
