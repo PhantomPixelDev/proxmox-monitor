@@ -6,20 +6,20 @@ QWidget {
     background: #1e1e2e;
     color: #cdd6f4;
     font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 13px;
+    font-size: 14px;
 }
 QWidget#root { background: #1e1e2e; }
 
 /* cards — high-contrast, clearly separated */
 QFrame#card {
     background: #2b2e4a;
-    border: 1.5px solid #5a5e85;
+    border: 2px solid #6d72a3;
     border-radius: 12px;
 }
 QFrame#card:hover { border-color: #6d72a3; }
 QFrame#cardHeader {
     background: #32365a;
-    border-bottom: 1px solid #4a4e7a;
+    border-bottom: 1.5px solid #4a4e7a;
     border-top-left-radius: 11px;
     border-top-right-radius: 11px;
 }
@@ -32,7 +32,7 @@ QLabel#title {
     letter-spacing: 0.2px;
 }
 QLabel#subtitle { font-size: 12px; color: #a6adc8; }
-QLabel#muted { color: #8d91b0; font-size: 11.5px; }
+QLabel#muted { color: #8d91b0; font-size: 12px; }
 QLabel#badge {
     background: #3a3d53;
     color: #bac2de;
@@ -41,7 +41,7 @@ QLabel#badge {
     font-size: 11px;
     font-weight: 600;
 }
-QLabel#cardTitle { font-size: 13.5px; font-weight: 600; color: #cdd6f4; }
+QLabel#cardTitle { font-size: 14.5px; font-weight: 600; color: #cdd6f4; }
 QLabel { padding: 1px 0px; }
 
 /* buttons */
@@ -142,25 +142,25 @@ QWidget {
     background: #eff1f5;
     color: #4c4f69;
     font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 13px;
+    font-size: 14px;
 }
 QWidget#root { background: #eff1f5; }
 
 QFrame#card {
     background: #ffffff;
-    border: 1.5px solid #c8cde0;
+    border: 2px solid #c8cde0;
     border-radius: 12px;
 }
 QFrame#cardHeader {
     background: #f2f4f9;
-    border-bottom: 1px solid #d8dce9;
+    border-bottom: 1.5px solid #d8dce9;
     border-top-left-radius: 11px;
     border-top-right-radius: 11px;
 }
 
 QLabel#title { font-size: 16px; font-weight: 700; color: #4c4f69; }
 QLabel#subtitle { font-size: 12px; color: #7c7f93; }
-QLabel#muted { color: #8c8fa1; font-size: 11.5px; }
+QLabel#muted { color: #8c8fa1; font-size: 12px; }
 QLabel#badge {
     background: #e6e9ef;
     color: #5c5f77;
@@ -169,7 +169,7 @@ QLabel#badge {
     font-size: 11px;
     font-weight: 600;
 }
-QLabel#cardTitle { font-size: 13.5px; font-weight: 600; color: #4c4f69; }
+QLabel#cardTitle { font-size: 14.5px; font-weight: 600; color: #4c4f69; }
 QLabel { padding: 1px 0px; }
 
 QPushButton {

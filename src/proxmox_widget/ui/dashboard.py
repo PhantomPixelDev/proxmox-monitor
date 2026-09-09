@@ -112,7 +112,7 @@ class Dashboard(QWidget):
         self._banner.setObjectName("banner")
         self._banner.setVisible(False)
         self._banner.setStyleSheet(
-            "QFrame#banner { background: #2a2d45; border: 1px solid #3a3d53; border-radius: 8px; }"
+            "QFrame#banner { background: #2a2d45; border: 1.5px solid #3a3d53; border-radius: 8px; }"
         )
         bl = QHBoxLayout(self._banner)
         bl.setContentsMargins(10, 8, 10, 8)
@@ -241,7 +241,7 @@ class Dashboard(QWidget):
         self._busy.clear()
         self.update_health(self._health)
 
-    def show_message(self, text: str, kind: str = "info", duration_ms: int = 4000) -> None:
+    def show_message(self, text: str, kind: str = "info", duration_ms: int = 4500) -> None:
         colors = {
             "info": ("#89b4fa", "ℹ️"),
             "success": ("#a6e3a1", "✓"),
@@ -254,7 +254,7 @@ class Dashboard(QWidget):
         self._banner_label.setText(text)
         self._banner_label.setStyleSheet("color: #cdd6f4; font-size: 12px;")
         self._banner.setStyleSheet(
-            f"QFrame#banner {{ background: #2a2d45; border: 1px solid {color}; border-radius: 8px; }}"
+            f"QFrame#banner {{ background: #2a2d45; border: 1.5px solid {color}; border-radius: 8px; }}"
         )
         self._banner.setVisible(True)
         self._banner_timer.start(duration_ms)
