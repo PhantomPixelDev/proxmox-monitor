@@ -16,11 +16,32 @@ from PySide6.QtWidgets import (
 )
 
 from proxmox_widget.config.models import ClusterHealth
+from proxmox_widget.resources.icons import make_app_icon
 from proxmox_widget.utils.format import fmt_bytes, fmt_uptime
+
+ICONS = {
+    "cluster": "🏢",
+    "node": "🖥️",
+    "vm": "🖥️",
+    "ct": "📦",
+    "storage": "💾",
+    "cpu": "⚡",
+    "ram": "🧠",
+    "disk": "💽",
+    "uptime": "⏱️",
+    "status": "●",
+    "net": "🌐",
+    "health": "💚",
+    "warn": "⚠️",
+    "offline": "🔴",
+    "online": "🟢",
+    "paused": "🟡",
+}
 
 
 class Dashboard(QWidget):
     open_settings = Signal()
+    open_proxmox_requested = Signal()
     action_requested = Signal(str, str, int, str, bool)
 
     def __init__(self) -> None:
@@ -41,11 +62,17 @@ class Dashboard(QWidget):
 
         header = QHBoxLayout()
         header.setSpacing(10)
+        # app icon
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(make_app_icon(28).pixmap(28, 28))
+        icon_lbl.setFixedSize(28, 28)
+        icon_lbl.setStyleSheet("background: transparent;")
+        header.addWidget(icon_lbl, 0)
         title_col = QVBoxLayout()
-        title_col.setSpacing(2)
+        title_col.setSpacing(1)
         title = QLabel("ProxmoxWidget")
         title.setObjectName("title")
-        subtitle = QLabel("live infrastructure")
+        subtitle = QLabel("live infrastructure  •  least-priv ready")
         subtitle.setObjectName("subtitle")
         title_col.addWidget(title)
         title_col.addWidget(subtitle)
@@ -90,7 +117,7 @@ class Dashboard(QWidget):
         footer.setSpacing(8)
         self.btn_open = QPushButton("↗  Open Proxmox")
         self.btn_open.setObjectName("primary")
-        self.btn_open.clicked.connect(self._open_proxmox)
+        self.btn_open.clicked.connect(lambda: self.open_proxmox_requested.emit())
         footer.addWidget(self.btn_open, 1)
         self.btn_refresh = QPushButton("↻")
         self.btn_refresh.setObjectName("ghost")
@@ -115,15 +142,15 @@ class Dashboard(QWidget):
         sa.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         return sa
 
-    def _open_proxmox(self) -> None:
-        if not self._health:
-            webbrowser.open("https://192.168.10.2:8006")
-            return
-        for h in self._health:
-            if h.online:
-                webbrowser.open(f"https://192.168.10.2:8006")
-                return
-        webbrowser.open("https://192.168.10.2:8006")
+    def set_clusters(self, clusters: list) -> None:
+        self._clusters = {c.id: c for c in clusters}
+        if clusters:
+            self.btn_open.setText(f"↗  Open {clusters[0].name}")
+            self.btn_open.setToolTip(clusters[0].base_url)
+            self.btn_open.setEnabled(True)
+        else:
+            self.btn_open.setText("↗  Open Proxmox")
+            self.btn_open.setEnabled(False)
 
     def _placeholder_refresh(self) -> None:
         self.lbl_status.setText("Refreshing…")
@@ -165,7 +192,7 @@ class Dashboard(QWidget):
         parent_layout.insertWidget(parent_layout.count() - 1, card)
         return card, lay
 
-    def _section_row(self, icon: str, title: str, badge: str | None = None) -> QHBoxLayout:
+    def _section_row(self, icon: str, title: str, badge: str | None = None, badge_color: str | None = None) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(8)
         lbl = QLabel(f"{icon}  {title}")
@@ -175,6 +202,8 @@ class Dashboard(QWidget):
             b = QLabel(badge)
             b.setObjectName("badge")
             b.setFixedHeight(20)
+            if badge_color:
+                b.setStyleSheet(f"background: {badge_color}; color: white; border-radius: 8px; padding: 2px 8px; font-size: 10.5px; font-weight: 700;")
             row.addWidget(b, 0)
         return row
 
@@ -182,10 +211,11 @@ class Dashboard(QWidget):
         lay = self.tab_dashboard.layout()
         assert isinstance(lay, QVBoxLayout)
         _, card_lay = self._card(lay)
-        dot = "🟢" if h.online else "🔴"
+        dot = ICONS["online"] if h.online else ICONS["offline"]
         badge = "ONLINE" if h.online else "OFFLINE"
-        card_lay.addLayout(self._section_row(dot, f"{h.cluster_name}", badge))
-        sub = QLabel(h.cluster_id)
+        color = "#2ecc71" if h.online else "#ff3b30"
+        card_lay.addLayout(self._section_row(ICONS["cluster"], f"{h.cluster_name}", badge, color))
+        sub = QLabel(f"{h.cluster_id}  ·  {len(h.nodes)} nodes")
         sub.setObjectName("muted")
         card_lay.addWidget(sub)
         if not h.online:
@@ -196,15 +226,15 @@ class Dashboard(QWidget):
             card_lay.addWidget(err)
             return
         for n in h.nodes:
-            ndot = "🟢" if n.status == "online" else "🔴"
-            line = QLabel(f"{ndot}  {n.node}  ·  {fmt_uptime(n.uptime)}")
+            ndot = ICONS["online"] if n.status == "online" else ICONS["offline"]
+            line = QLabel(f"{ndot}  {n.node}  ·  {ICONS['uptime']} {fmt_uptime(n.uptime)}  ·  {ICONS['cpu']} {n.maxcpu}c")
             line.setObjectName("muted")
             card_lay.addWidget(line)
-            for label, val, oid in [("CPU", n.cpu, ""), ("RAM", n.mem / n.maxmem if n.maxmem else 0, "ram"), ("Disk", n.disk / n.maxdisk if n.maxdisk else 0, "disk")]:
+            for icon, label, val, oid in [(ICONS["cpu"], "CPU", n.cpu, ""), (ICONS["ram"], "RAM", n.mem / n.maxmem if n.maxmem else 0, "ram"), (ICONS["disk"], "Disk", n.disk / n.maxdisk if n.maxdisk else 0, "disk")]:
                 row = QHBoxLayout()
                 row.setSpacing(8)
-                lk = QLabel(label)
-                lk.setFixedWidth(34)
+                lk = QLabel(f"{icon} {label}")
+                lk.setFixedWidth(58)
                 lk.setObjectName("muted")
                 row.addWidget(lk)
                 bar = QProgressBar()
@@ -222,7 +252,7 @@ class Dashboard(QWidget):
             sep.setFrameShape(QFrame.Shape.HLine)
             sep.setFixedHeight(1)
             card_lay.addWidget(sep)
-            summ = QLabel(f"{len(h.vms)} VMs  ·  {len(h.containers)} containers  ·  {len(h.storages)} storages")
+            summ = QLabel(f"{ICONS['vm']} {len(h.vms)} VMs  ·  {ICONS['ct']} {len(h.containers)} containers  ·  {ICONS['storage']} {len(h.storages)} storages")
             summ.setObjectName("muted")
             card_lay.addWidget(summ)
 
@@ -231,21 +261,18 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for n in h.nodes:
             _, cl = self._card(lay)
-            dot = "🟢" if n.status == "online" else "🔴"
-            cl.addLayout(self._section_row(dot, n.node, n.status.upper()))
-            sub = QLabel(f"{h.cluster_name}  ·  {n.maxcpu} cores  ·  {fmt_uptime(n.uptime)}")
+            dot = ICONS["online"] if n.status == "online" else ICONS["offline"]
+            color = "#2ecc71" if n.status == "online" else "#ff3b30"
+            cl.addLayout(self._section_row(ICONS["node"], n.node, n.status.upper(), color))
+            sub = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['cpu']} {n.maxcpu}c  ·  {ICONS['uptime']} {fmt_uptime(n.uptime)}")
             sub.setObjectName("muted")
             cl.addWidget(sub)
-            for label, used, total, oid in [("CPU", n.cpu, 1.0, ""), ("RAM", n.mem, n.maxmem, "ram"), ("Disk", n.disk, n.maxdisk, "disk")]:
-                pct = (used / total * 100) if total and oid else (used * 100 if oid == "" else 0)
-                if oid == "":
-                    pct = int(used * 100)
-                else:
-                    pct = int(used / total * 100) if total else 0
+            for icon, label, used, total, oid in [(ICONS["cpu"], "CPU", n.cpu, 1.0, ""), (ICONS["ram"], "RAM", n.mem, n.maxmem, "ram"), (ICONS["disk"], "Disk", n.disk, n.maxdisk, "disk")]:
+                pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                 row = QHBoxLayout()
                 row.setSpacing(8)
-                lk = QLabel(label)
-                lk.setFixedWidth(34)
+                lk = QLabel(f"{icon} {label}")
+                lk.setFixedWidth(58)
                 lk.setObjectName("muted")
                 row.addWidget(lk)
                 bar = QProgressBar()
@@ -257,20 +284,19 @@ class Dashboard(QWidget):
                 row.addWidget(bar, 1)
                 cl.addLayout(row)
                 if oid:
-                    # human readable under bar
-                    det = QLabel(f"{fmt_bytes(int(used))} / {fmt_bytes(int(total))}" if oid else f"{pct:.0f}%")
+                    det = QLabel(f"{fmt_bytes(int(used))} / {fmt_bytes(int(total))}")
                     det.setObjectName("muted")
-                    det.setStyleSheet("font-size: 10.5px; margin-left: 42px;")
+                    det.setStyleSheet("font-size: 10.5px; margin-left: 66px;")
                     cl.addWidget(det)
-            cl.addWidget(self._kv("Status", n.status))
-            cl.addWidget(self._kv("Uptime", fmt_uptime(n.uptime)))
+            cl.addWidget(self._kv(f"{ICONS['status']} Status", n.status))
+            cl.addWidget(self._kv(f"{ICONS['uptime']} Uptime", fmt_uptime(n.uptime)))
 
     def _add_vms(self, h: ClusterHealth) -> None:
         lay = self.tab_vms.layout()
         assert isinstance(lay, QVBoxLayout)
         for vm in h.vms:
             _, cl = self._card(lay)
-            dot = "🟢" if vm.status == "running" else "🔴" if vm.status == "stopped" else "🟡"
+            dot = ICONS["online"] if vm.status == "running" else ICONS["offline"] if vm.status == "stopped" else ICONS["paused"]
             head = QHBoxLayout()
             head.setSpacing(8)
             lbl_name = QLabel(f"{dot}  {vm.name}")
@@ -283,19 +309,19 @@ class Dashboard(QWidget):
             lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
             head.addWidget(lbl_id, 0)
             cl.addLayout(head)
-            loc = QLabel(f"{h.cluster_name} · {vm.node}")
+            loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {vm.node}")
             loc.setObjectName("muted")
             cl.addWidget(loc)
-            cl.addWidget(self._kv("Status", vm.status + ("  · template" if vm.template else "")))
-            cl.addWidget(self._kv("vCPUs", str(vm.cpus)))
-            # usage bars for running VMs
+            status_color = "#2ecc71" if vm.status == "running" else "#ff3b30" if vm.status == "stopped" else "#f1c40f"
+            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{status_color}; font-weight:600;\">{vm.status}</span>' + ("  · template" if vm.template else "")))
+            cl.addWidget(self._kv(f"{ICONS['cpu']} vCPUs", str(vm.cpus)))
             if vm.status == "running":
-                for label, used, total, oid in [("CPU", vm.cpu, 1.0, ""), ("RAM", vm.mem, vm.maxmem, "ram")]:
+                for icon, label, used, total, oid in [(ICONS["cpu"], "CPU", vm.cpu, 1.0, ""), (ICONS["ram"], "RAM", vm.mem, vm.maxmem, "ram")]:
                     pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                     row = QHBoxLayout()
                     row.setSpacing(8)
-                    lk = QLabel(label)
-                    lk.setFixedWidth(34)
+                    lk = QLabel(f"{icon} {label}")
+                    lk.setFixedWidth(58)
                     lk.setObjectName("muted")
                     row.addWidget(lk)
                     bar = QProgressBar()
@@ -307,8 +333,8 @@ class Dashboard(QWidget):
                     row.addWidget(bar, 1)
                     cl.addLayout(row)
             else:
-                cl.addWidget(self._kv("CPU", f"{vm.cpu*100:.0f}%"))
-                cl.addWidget(self._kv("RAM", f"{fmt_bytes(vm.mem)} / {fmt_bytes(vm.maxmem)}"))
+                cl.addWidget(self._kv(f"{ICONS['cpu']} CPU", f"{vm.cpu*100:.0f}%"))
+                cl.addWidget(self._kv(f"{ICONS['ram']} RAM", f"{fmt_bytes(vm.mem)} / {fmt_bytes(vm.maxmem)}"))
             row = QHBoxLayout()
             row.setSpacing(6)
             for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
@@ -324,7 +350,7 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for ct in h.containers:
             _, cl = self._card(lay)
-            dot = "🟢" if ct.status == "running" else "🔴"
+            dot = ICONS["online"] if ct.status == "running" else ICONS["offline"]
             head = QHBoxLayout()
             head.setSpacing(8)
             lbl_name = QLabel(f"{dot}  {ct.name}")
@@ -337,17 +363,18 @@ class Dashboard(QWidget):
             lbl_id.setAlignment(Qt.AlignmentFlag.AlignCenter)
             head.addWidget(lbl_id, 0)
             cl.addLayout(head)
-            loc = QLabel(f"{h.cluster_name} · {ct.node}")
+            loc = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['node']} {ct.node}")
             loc.setObjectName("muted")
             cl.addWidget(loc)
-            cl.addWidget(self._kv("Status", ct.status))
+            color = "#2ecc71" if ct.status == "running" else "#ff3b30"
+            cl.addWidget(self._kv(f"{ICONS['status']} Status", f'<span style=\"color:{color}; font-weight:600;\">{ct.status}</span>'))
             if ct.status == "running":
-                for label, used, total, oid in [("CPU", ct.cpu, 1.0, ""), ("RAM", ct.mem, ct.maxmem, "ram")]:
+                for icon, label, used, total, oid in [(ICONS["cpu"], "CPU", ct.cpu, 1.0, ""), (ICONS["ram"], "RAM", ct.mem, ct.maxmem, "ram")]:
                     pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                     row = QHBoxLayout()
                     row.setSpacing(8)
-                    lk = QLabel(label)
-                    lk.setFixedWidth(34)
+                    lk = QLabel(f"{icon} {label}")
+                    lk.setFixedWidth(58)
                     lk.setObjectName("muted")
                     row.addWidget(lk)
                     bar = QProgressBar()
@@ -359,7 +386,7 @@ class Dashboard(QWidget):
                     row.addWidget(bar, 1)
                     cl.addLayout(row)
             else:
-                cl.addWidget(self._kv("RAM", f"{fmt_bytes(ct.mem)} / {fmt_bytes(ct.maxmem)}"))
+                cl.addWidget(self._kv(f"{ICONS['ram']} RAM", f"{fmt_bytes(ct.mem)} / {fmt_bytes(ct.maxmem)}"))
             row = QHBoxLayout()
             row.setSpacing(6)
             for label, act in [("▶ Start", "start"), ("⏹ Stop", "stop"), ("↻ Reboot", "reboot")]:
@@ -374,17 +401,15 @@ class Dashboard(QWidget):
         assert isinstance(lay, QVBoxLayout)
         for s in h.storages:
             _, cl = self._card(lay)
-            head = QLabel(f"💾  {s.storage}")
-            head.setObjectName("cardTitle")
-            cl.addWidget(head)
-            sub = QLabel(f"{s.type}  ·  {s.node}  ·  {s.status}")
+            cl.addLayout(self._section_row(ICONS["storage"], s.storage, s.type.upper()))
+            sub = QLabel(f"{ICONS['node']} {s.node}  ·  {ICONS['status']} {s.status}  ·  {'🔗 shared' if s.shared else '📌 local'}")
             sub.setObjectName("muted")
             cl.addWidget(sub)
             used_pct = (s.used / s.total * 100) if s.total else 0
             row = QHBoxLayout()
             row.setSpacing(8)
-            lk = QLabel("Use")
-            lk.setFixedWidth(34)
+            lk = QLabel(f"{ICONS['disk']} Use")
+            lk.setFixedWidth(58)
             lk.setObjectName("muted")
             row.addWidget(lk)
             bar = QProgressBar()
@@ -396,11 +421,11 @@ class Dashboard(QWidget):
             cl.addLayout(row)
             det = QLabel(f"{fmt_bytes(s.used)} / {fmt_bytes(s.total)}  ·  {fmt_bytes(s.avail)} free")
             det.setObjectName("muted")
-            det.setStyleSheet("font-size: 10.5px; margin-left: 42px;")
+            det.setStyleSheet("font-size: 10.5px; margin-left: 66px;")
             cl.addWidget(det)
             if not s.enabled:
-                warn = QLabel("disabled")
-                warn.setStyleSheet("color: #f38ba8; font-size: 11px;")
+                warn = QLabel(f"{ICONS['warn']} disabled")
+                warn.setStyleSheet("color: #f38ba8; font-size: 11px; font-weight: 600;")
                 cl.addWidget(warn)
 
     def _kv(self, k: str, v: str) -> QLabel:

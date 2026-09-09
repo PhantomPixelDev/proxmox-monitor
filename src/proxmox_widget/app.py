@@ -13,6 +13,7 @@ from proxmox_widget.api.client import ProxmoxClient
 from proxmox_widget.config.manager import load_settings
 from proxmox_widget.config.models import ClusterHealth
 from proxmox_widget.core.notifier import Notifier
+from proxmox_widget.resources.icons import make_app_icon, make_tray_icon
 from proxmox_widget.ui.dashboard import Dashboard
 from proxmox_widget.ui.settings_dialog import SettingsDialog
 from proxmox_widget.ui.themes import qss_for
@@ -20,7 +21,7 @@ from proxmox_widget.ui.tray import TrayManager
 
 
 def _pick_icon() -> QIcon:
-    return QIcon()
+    return make_app_icon(256)
 
 
 class ProxmoxWidgetApp:
@@ -28,11 +29,14 @@ class ProxmoxWidgetApp:
         self.app = app
         self.settings = load_settings()
         self.app.setQuitOnLastWindowClosed(False)
+        icon = _pick_icon()
+        self.app.setWindowIcon(icon)
 
-        self.tray_icon = QSystemTrayIcon(_pick_icon(), app)
+        self.tray_icon = QSystemTrayIcon(make_tray_icon(64, online=True), app)
         self.tray = TrayManager(self.tray_icon)
 
         self.dashboard = Dashboard()
+        self.dashboard.setWindowIcon(icon)
         self.notifier = Notifier(self.tray_icon)
 
         self._health: list[ClusterHealth] = []
@@ -50,8 +54,11 @@ class ProxmoxWidgetApp:
         self.tray.refresh_requested.connect(self.refresh_now)
         self.tray.quit_requested.connect(self.app.quit)
         self.dashboard.open_settings.connect(self.show_settings)
+        self.dashboard.open_proxmox_requested.connect(self._open_proxmox)
         self.dashboard.action_requested.connect(self._on_action)
         self.notifier.notification_requested.connect(lambda t, m: logger.info("notify {} {}", t, m))
+        self.tray.set_clusters(self.settings.clusters)
+        self.dashboard.set_clusters(self.settings.clusters)
 
     def _apply_theme(self) -> None:
         qss = qss_for(self.settings.theme.value)
@@ -90,9 +97,24 @@ class ProxmoxWidgetApp:
 
     def _on_settings_saved(self, new_settings) -> None:  # type: ignore[no-untyped-def]
         self.settings = new_settings
+        self.tray.set_clusters(self.settings.clusters)
+        self.dashboard.set_clusters(self.settings.clusters)
         self._apply_theme()
         self._timer.start(max(5, self.settings.refresh_interval_seconds) * 1000)
         self.refresh_now()
+
+    def _open_proxmox(self) -> None:
+        import webbrowser as wb
+
+        if not self.settings.clusters:
+            return
+        for h in self._health:
+            if h.online:
+                c = next((x for x in self.settings.clusters if x.id == h.cluster_id), None)
+                if c:
+                    wb.open(c.base_url)
+                    return
+        wb.open(self.settings.clusters[0].base_url)
 
     def _on_timer(self) -> None:
         self.refresh_now()
@@ -127,6 +149,10 @@ class ProxmoxWidgetApp:
         self._health = results
         self.dashboard.update_health(results)
         self.tray.update_from_health(results)
+        # update tray icon color/badging based on health
+        online = sum(1 for h in results if h.online)
+        alerts = sum(1 for h in results if not h.online)
+        self.tray_icon.setIcon(make_tray_icon(64, online=(online > 0), alerts=alerts))
         self.notifier.check(results)
 
     def _on_action(self, cluster_id: str, node: str, vmid: int, action: str, is_lxc: bool) -> None:

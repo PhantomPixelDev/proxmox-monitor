@@ -14,40 +14,64 @@ class TrayManager(QObject):
     show_settings = Signal()
     quit_requested = Signal()
     refresh_requested = Signal()
+    open_cluster_requested = Signal(str)
 
     def __init__(self, tray: QSystemTrayIcon) -> None:
         super().__init__()
         self.tray = tray
         self.tray.setToolTip("ProxmoxWidget — no data yet")
         self.tray.activated.connect(self._on_activated)
+        self._clusters: list = []
+        self._menu: QMenu | None = None
+        self._open_menu: QMenu | None = None
         self._build_menu()
         self.tray.show()
 
     def _build_menu(self) -> None:
         m = QMenu()
-        self.act_show = QAction("Show Dashboard", m)
+        m.setStyleSheet("QMenu { padding: 6px; } QMenu::item { padding: 7px 18px 7px 14px; border-radius: 6px; } QMenu::item:selected { background: #34374e; } QMenu::separator { height: 1px; background: #3a3d53; margin: 6px 8px; }")
+        self.act_show = QAction("🖥  Show Dashboard", m)
         self.act_show.triggered.connect(lambda: self.show_dashboard.emit())
         m.addAction(self.act_show)
 
-        self.act_refresh = QAction("↻ Refresh now", m)
+        self.act_refresh = QAction("↻  Refresh now", m)
         self.act_refresh.triggered.connect(lambda: self.refresh_requested.emit())
         m.addAction(self.act_refresh)
-
         m.addSeparator()
-        self.act_open_pve = QAction("Open Proxmox → 192.168.10.2", m)
-        self.act_open_pve.triggered.connect(lambda: webbrowser.open("https://192.168.10.2:8006"))
-        m.addAction(self.act_open_pve)
 
-        self.act_settings = QAction("⚙ Settings", m)
+        self._open_menu = m.addMenu("↗  Open Proxmox")
+        self._rebuild_open_menu()
+
+        self.act_settings = QAction("⚙  Settings", m)
         self.act_settings.triggered.connect(lambda: self.show_settings.emit())
         m.addAction(self.act_settings)
-
         m.addSeparator()
-        act_quit = QAction("Quit", m)
+        act_quit = QAction("✕  Quit", m)
         act_quit.triggered.connect(lambda: self.quit_requested.emit())
         m.addAction(act_quit)
-
         self.tray.setContextMenu(m)
+        self._menu = m
+
+    def _rebuild_open_menu(self) -> None:
+        if self._open_menu is None:
+            return
+        self._open_menu.clear()
+        if not self._clusters:
+            a = QAction("No clusters — add in Settings", self._open_menu)
+            a.setEnabled(False)
+            self._open_menu.addAction(a)
+            return
+        for c in self._clusters:
+            label = f"{c.name}  ({c.host}:{c.port})"
+            a = QAction(label, self._open_menu)
+            a.triggered.connect(lambda _=False, url=c.base_url: webbrowser.open(url))
+            self._open_menu.addAction(a)
+        if len(self._clusters) == 1:
+            self._open_menu.setTitle(f"↗  Open {self._clusters[0].name}")
+
+    def set_clusters(self, clusters: list) -> None:
+        self._clusters = list(clusters)
+        self._rebuild_open_menu()
 
     def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -62,8 +86,6 @@ class TrayManager(QObject):
         running = sum(1 for h in health for vm in h.vms if vm.status == "running")
         tip = f"ProxmoxWidget — {online}/{len(health)} clusters online • {running}/{total_vms} VMs running"
         self.tray.setToolTip(tip)
-        # badge: we don't have real icon variants, use tooltip + message
-        # icon could be swapped here based on health (green/red)
 
     def set_icon(self, icon: QIcon) -> None:
         self.tray.setIcon(icon)
