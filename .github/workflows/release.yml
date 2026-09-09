@@ -181,9 +181,7 @@ jobs:
           SETUP_EXE="dist/ProxmoxWidget-${TAG}-Windows-x64-Setup.exe"
           if command -v iscc >/dev/null 2>&1; then
             echo "iscc found — building installer"
-            # Pass version + standalone dir via defines; ISS uses {#MyAppVersion} and {#SourceDir}
-            iscc //DMyAppVersion="$TAG" //DSourceDir="$STANDALONE_DIR" //F"ProxmoxWidget-${TAG}-Windows-x64-Setup" //O"dist" scripts/innosetup.iss || \
-            iscc /DMyAppVersion="$TAG" /DSourceDir="$STANDALONE_DIR" /F"ProxmoxWidget-${TAG}-Windows-x64-Setup" /O"dist" scripts/innosetup.iss
+            MSYS_NO_PATHCONV=1 iscc "/DMyAppVersion=$TAG" "/DSourceDir=$STANDALONE_DIR" "/Odist" "/FProxmoxWidget-${TAG}-Windows-x64-Setup" scripts/innosetup.iss
             ls -lh dist/*.exe || true
           else
             echo "iscc not available on this runner — skipping Setup.exe (fallback echo). Install Inno Setup to enable installer build."
@@ -258,7 +256,8 @@ jobs:
           cd dist
           rm -f SHA256SUMS.txt
           echo "=== Hashing dist contents ==="
-          for f in *.zip *.exe *.tar.gz *.dmg *.bin 2>/dev/null; do
+          shopt -s nullglob 2>/dev/null || true
+          for f in *.zip *.exe *.tar.gz *.dmg *.bin; do
             [[ -f "$f" ]] || continue
             if command -v sha256sum >/dev/null; then
               sha256sum "$f" >> SHA256SUMS.txt
