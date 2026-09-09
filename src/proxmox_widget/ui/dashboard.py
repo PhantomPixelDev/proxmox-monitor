@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import webbrowser
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,

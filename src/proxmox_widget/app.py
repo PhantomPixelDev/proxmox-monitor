@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-import webbrowser
 
 from loguru import logger
 from PySide6.QtCore import Qt, QTimer
