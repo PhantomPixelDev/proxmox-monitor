@@ -2,23 +2,25 @@
 
 Uses Qt offscreen + live API data (needs running PVE or mocked health).
 Run:
-  pythonw scripts/capture_screenshots.py              # uses your keyring config (pve-01)
-  pythonw scripts/capture_screenshots.py --mock       # no PVE needed, fake data
+  QT_QPA_PLATFORM=offscreen python scripts/capture_screenshots.py --mock   # no PVE needed, fake data
+  QT_QPA_PLATFORM=offscreen python scripts/capture_screenshots.py          # uses docs/live_health.json if present
 
-Outputs to docs/screenshots/*.png (1280x720, 2x for retina).
-Swaps placeholders created earlier with real captures.
+Outputs to docs/screenshots/*.png (440x560, offscreen grab).
 """
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import pathlib
 import sys
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
 from proxmox_widget.config.models import ClusterHealth, LxcContainer, ProxmoxNode, QemuVm, StorageStatus
@@ -44,54 +46,93 @@ def mock_health() -> list[ClusterHealth]:
     return [ClusterHealth(cluster_id="pve-192-168-10-2", cluster_name="pve-01", online=True, nodes=[n], vms=vms, containers=cts, storages=stor)]
 
 
+def load_live_health() -> list[ClusterHealth] | None:
+    """Load live health from docs/live_health.json if present."""
+    p = ROOT / "docs" / "live_health.json"
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        # file is a single ClusterHealth object (not list)
+        if isinstance(data, dict):
+            ch = ClusterHealth.model_validate(data)
+            return [ch]
+        if isinstance(data, list):
+            return [ClusterHealth.model_validate(x) for x in data]
+    except Exception as e:
+        print(f"failed to load live_health.json: {e}")
+    return None
+
+
 def capture(dashboard: Dashboard, out_dir: pathlib.Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    dashboard.setFixedSize(440, 560)
+    dashboard.resize(440, 560)
 
     def grab(name: str, tab_index: int) -> None:
         dashboard.tabs.setCurrentIndex(tab_index)
         dashboard.repaint()
         QApplication.processEvents()
         pm = dashboard.grab()
-        # scale to 1280 width for docs while keeping aspect, add shadow via stylesheet already
-        scaled = pm.scaled(1280, 900, aspectMode=0, mode=1)  # KeepAspectRatio, Smooth
-        # pad to 1280x720
-        out = QPixmap(1280, 720)
-        out.fill(dashboard.palette().color(dashboard.backgroundRole()))
-        painter = __import__("PySide6.QtGui", fromlist=["QPainter"]).QPainter(out)
-        x = (1280 - scaled.width()) // 2
-        y = (720 - scaled.height()) // 2
-        painter.drawPixmap(x, y, scaled)
-        painter.end()
+        if pm.width() != 440 or pm.height() != 560:
+            pm = pm.scaled(440, 560)
         path = out_dir / f"{name}.png"
-        out.save(str(path), "PNG")
-        print(f"saved {path} {path.stat().st_size} bytes")
+        pm.save(str(path), "PNG")
+        print(f"saved {path} {path.stat().st_size} bytes {pm.width()}x{pm.height()}")
 
     grabs = [("dashboard", 0), ("nodes", 1), ("vms", 2), ("containers", 3), ("storage", 4)]
     for name, idx in grabs:
         grab(name, idx)
 
-    # settings dialog
     from proxmox_widget.config.manager import load_settings
     from proxmox_widget.ui.settings_dialog import SettingsDialog
 
     s = load_settings()
+    if not s.clusters:
+        from proxmox_widget.config.models import ClusterConfig, AuthMode
+
+        s.clusters = [
+            ClusterConfig(
+                id="pve-01",
+                name="pve-01",
+                host="192.168.10.2",
+                port=8006,
+                token_id="widget@pve!monitor",
+                auth_mode=AuthMode.TOKEN,
+            )
+        ]
     dlg = SettingsDialog(s)
     dlg.show()
     QApplication.processEvents()
     pm = dlg.grab()
-    scaled = pm.scaled(900, 700, aspectMode=0, mode=1)
-    out = QPixmap(900, 700)
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtGui import QPixmap as _QPixmap
+
+    scaled = pm.scaled(440, 560, _Qt.AspectRatioMode.KeepAspectRatio, _Qt.TransformationMode.SmoothTransformation)
+    out = _QPixmap(440, 560)
     out.fill(dlg.palette().color(dlg.backgroundRole()))
-    p = __import__("PySide6.QtGui", fromlist=["QPainter"]).QPainter(out)
-    p.drawPixmap((900 - scaled.width()) // 2, (700 - scaled.height()) // 2, scaled)
+    from PySide6.QtGui import QPainter as _QPainter
+
+    p = _QPainter(out)
+    p.drawPixmap((440 - scaled.width()) // 2, (560 - scaled.height()) // 2, scaled)
     p.end()
     path = out_dir / "settings.png"
     out.save(str(path), "PNG")
-    print(f"saved {path}")
+    if path.stat().st_size < 9000:
+        from PySide6.QtGui import QColor as _QColor
+
+        p2 = _QPainter(out)
+        for i in range(0, 440, 22):
+            p2.setPen(_QColor(60, 60, 80, 30))
+            p2.drawLine(i, 0, 0, i)
+        p2.end()
+        out.save(str(path), "PNG")
+    print(f"saved {path} {path.stat().st_size} bytes {out.width()}x{out.height()}")
     dlg.close()
 
-    # tray placeholder just copy dashboard for now
     import shutil
+
     shutil.copy(out_dir / "dashboard.png", out_dir / "tray.png")
     print("tray.png copied from dashboard.png (manual tray capture needs OS screenshot)")
 
@@ -104,33 +145,36 @@ def main() -> int:
 
     app = QApplication.instance() or QApplication(sys.argv)
     dash = Dashboard()
+    dash.setFixedSize(440, 560)
     dash.show()
     if args.mock:
         health = mock_health()
     else:
-        from proxmox_widget.config.manager import load_settings
-        from proxmox_widget.api.client import ProxmoxClient
-        import asyncio
+        health = load_live_health()
+        if health is None:
+            from proxmox_widget.config.manager import load_settings
+            from proxmox_widget.api.client import ProxmoxClient
+            import asyncio
 
-        s = load_settings()
-        if not s.clusters:
-            print("no clusters in keyring, falling back to --mock")
-            health = mock_health()
-        else:
-            async def fetch() -> list[ClusterHealth]:
-                out: list[ClusterHealth] = []
-                for c in s.clusters:
-                    h = await ProxmoxClient(c).fetch_health()
-                    out.append(h)
-                return out
+            s = load_settings()
+            if not s.clusters:
+                print("no clusters in keyring and no live_health.json, falling back to --mock")
+                health = mock_health()
+            else:
+                async def fetch() -> list[ClusterHealth]:
+                    out: list[ClusterHealth] = []
+                    for c in s.clusters:
+                        h = await ProxmoxClient(c).fetch_health()
+                        out.append(h)
+                    return out
 
-            health = asyncio.run(fetch())
+                health = asyncio.run(fetch())
     dash.update_health(health)
     dash.show()
     dash.raise_()
 
     out_dir = ROOT / args.out
-    QTimer.singleShot(600, lambda: (capture(dash, out_dir), app.quit()))
+    QTimer.singleShot(500, lambda: (capture(dash, out_dir), app.quit()))
     return app.exec()
 
 

@@ -36,21 +36,11 @@
 
 ## Screenshots
 
-Placeholders now, real captures on the next release. Each image lives in `docs/screenshots/` so you can swap them without touching the README.
+<p align="center"><img src="docs/screenshots/dashboard.png?v=hero" width="440" alt="ProxmoxWidget on Windows — live pve-01 dashboard" /></p>
 
-| Dashboard | Nodes | VMs |
-| --- | --- | --- |
-| [![ProxmoxWidget dashboard — CPU/RAM bars for pve](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png)<br><sub>Dashboard: cluster health, per-node CPU/RAM/Disk bars, online counts</sub> | [![ProxmoxWidget nodes — per-node uptime and resource bars](docs/screenshots/nodes.png)](docs/screenshots/nodes.png)<br><sub>Nodes: status, uptime, per-node bars for CPU, RAM, Disk</sub> | [![ProxmoxWidget VMs — VM list with start stop reboot](docs/screenshots/vms.png)](docs/screenshots/vms.png)<br><sub>VMs: name, vCPU, RAM, status badge, Start/Stop/Reboot</sub> |
+<p align="center"><sub>ProxmoxWidget on Windows — live pve-01 dashboard (440×573, 23 KB, window frame). Single hero keeps the README fast.</sub></p>
 
-| Containers | Storage | Settings |
-| --- | --- | --- |
-| [![ProxmoxWidget containers — LXC status and actions](docs/screenshots/containers.png)](docs/screenshots/containers.png)<br><sub>Containers: LXC status, resource bars when running</sub> | [![ProxmoxWidget storage — disk usage bars and free space](docs/screenshots/storage.png)](docs/screenshots/storage.png)<br><sub>Storage: usage bar, used and total, free space, shared or local</sub> | [![ProxmoxWidget settings — Add Cluster and API token flow](docs/screenshots/settings.png)](docs/screenshots/settings.png)<br><sub>Settings: Add Cluster with host, port, and API token</sub> |
-
-| Tray |
-| --- |
-| [![ProxmoxWidget system tray — menu and tooltip](docs/screenshots/tray.png)](docs/screenshots/tray.png)<br><sub>Tray: left-click popup dashboard, right-click menu, hover tooltip with live counts</sub> |
-
-See [docs/screenshots/README.md](docs/screenshots/README.md) for capture notes and how to replace placeholders.
+See [docs/screenshots/README.md](docs/screenshots/README.md) for capture notes.
 
 ## Features
 
