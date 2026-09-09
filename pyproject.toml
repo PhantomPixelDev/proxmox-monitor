@@ -1,0 +1,87 @@
+[project]
+name = "proxmox-widget"
+version = "0.1.0"
+description = "Lightweight cross-platform system-tray client for Proxmox VE"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ProxmoxWidget" }]
+keywords = ["proxmox", "pve", "system-tray", "desktop", "monitoring"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: X11 Applications :: Qt",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "PySide6>=6.6",
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.1",
+  "platformdirs>=4.2",
+  "keyring>=25.0",
+  "psutil>=6.0",
+  "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-qt>=4.4",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "ruff>=0.3",
+  "basedpyright>=1.15",
+  "types-psutil",
+]
+
+[project.urls]
+Homepage = "https://github.com/proxmox-widget/proxmox-widget"
+Issues = "https://github.com/proxmox-widget/proxmox-widget/issues"
+
+[project.scripts]
+proxmox-widget = "proxmox_widget.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/proxmox_widget"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4", "UP", "SIM", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+include = ["src"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+reportAny = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+qt_api = "pyside6"
+addopts = "-v --cov=proxmox_widget --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/proxmox_widget"]
+branch = true
+
+[tool.coverage.report]
+skip_covered = false
+show_missing = true
