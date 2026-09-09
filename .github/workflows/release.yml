@@ -19,16 +19,10 @@ jobs:
         include:
           - os: windows-latest
             artifact-name: ProxmoxWidget-windows
-            output-file: ProxmoxWidget-windows.exe
-            nuitka-extra: --windows-console-mode=disable --windows-icon-from-ico=src/proxmox_widget/resources/app.ico
           - os: ubuntu-latest
             artifact-name: ProxmoxWidget-linux
-            output-file: ProxmoxWidget-linux.bin
-            nuitka-extra: ""
           - os: macos-latest
             artifact-name: ProxmoxWidget-macos
-            output-file: ProxmoxWidget-macos.bin
-            nuitka-extra: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +38,6 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Qt6 deps for PySide6 / Nuitka onefile runtime
           sudo apt-get install -y libgl1 libegl1 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0 || true
 
       - name: Install system deps (macOS)
@@ -69,51 +62,243 @@ jobs:
           restore-keys: |
             nuitka-${{ runner.os }}-
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (standalone, no --onefile)
         shell: bash
         run: |
           set -euo pipefail
-          echo "Building ${{ matrix.artifact-name }} -> ${{ matrix.output-file }}"
-          EXTRA="${{ matrix.nuitka-extra }}"
-          python -m nuitka \
-            --standalone \
-            --onefile \
-            --enable-plugin=pyside6 \
-            --assume-yes-for-downloads \
-            --include-data-dir=src/proxmox_widget/resources=resources \
-            --include-package=proxmox_widget \
-            ${EXTRA} \
-            --output-filename=${{ matrix.output-file }} \
-            --output-dir=dist \
-            --main=src/proxmox_widget/__main__.py \
-            --python-flag=-m
-          ls -lh dist/
-          echo "Build done: dist/${{ matrix.output-file }}"
+          TAG="${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}"
+          TAG="${TAG#v}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Building standalone for ${{ matrix.os }} tag=$TAG"
+          # Windows: standalone folder -> Portable ZIP + Inno Setup installer (no TEMP extraction, ~2s cold start)
+          # Linux/macOS: standalone folder -> tar.gz (macOS also tries --macos-create-app-bundle)
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            python -m nuitka \
+              --standalone \
+              --assume-yes-for-downloads \
+              --enable-plugin=pyside6 \
+              --include-package=proxmox_widget \
+              --include-data-dir=src/proxmox_widget/resources=resources \
+              --main \
+              --python-flag=-m \
+              --windows-console-mode=disable \
+              --windows-icon-from-ico=src/proxmox_widget/resources/app.ico \
+              --output-dir=dist \
+              src/proxmox_widget/__main__.py
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            # Try app bundle; fallback to plain standalone if bundle flags fail
+            if python -m nuitka --help 2>&1 | grep -q "macos-create-app-bundle"; then
+              python -m nuitka \
+                --standalone \
+                --assume-yes-for-downloads \
+                --enable-plugin=pyside6 \
+                --include-package=proxmox_widget \
+                --include-data-dir=src/proxmox_widget/resources=resources \
+                --main \
+                --python-flag=-m \
+                --macos-create-app-bundle \
+                --macos-app-icon=src/proxmox_widget/resources/app.png \
+                --output-dir=dist \
+                src/proxmox_widget/__main__.py || \
+              python -m nuitka \
+                --standalone \
+                --assume-yes-for-downloads \
+                --enable-plugin=pyside6 \
+                --include-package=proxmox_widget \
+                --include-data-dir=src/proxmox_widget/resources=resources \
+                --main \
+                --python-flag=-m \
+                --output-dir=dist \
+                src/proxmox_widget/__main__.py
+            else
+              python -m nuitka \
+                --standalone \
+                --assume-yes-for-downloads \
+                --enable-plugin=pyside6 \
+                --include-package=proxmox_widget \
+                --include-data-dir=src/proxmox_widget/resources=resources \
+                --main \
+                --python-flag=-m \
+                --output-dir=dist \
+                src/proxmox_widget/__main__.py
+            fi
+          else
+            python -m nuitka \
+              --standalone \
+              --assume-yes-for-downloads \
+              --enable-plugin=pyside6 \
+              --include-package=proxmox_widget \
+              --include-data-dir=src/proxmox_widget/resources=resources \
+              --main \
+              --python-flag=-m \
+              --output-dir=dist \
+              src/proxmox_widget/__main__.py
+          fi
+          echo "=== Build output ==="
+          ls -R dist || true
+          ls -lh dist/ || true
+
+      - name: Profile build size (what makes build large)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Profiling standalone size ==="
+          du -sh dist/* 2>/dev/null || du -sh dist 2>/dev/null || true
+          echo "--- Top 30 largest files in dist ---"
+          find dist -type f -exec du -h {} + 2>/dev/null | sort -rh | head -n 30 || true
+          echo "--- By extension ---"
+          find dist -type f -name "*.so" -o -name "*.pyd" -o -name "*.dll" -o -name "*.dylib" 2>/dev/null | xargs du -ch 2>/dev/null | tail -n 20 || true
+          echo "--- Disk usage detail ---"
+          if command -v du >/dev/null 2>&1; then du -sh dist 2>/dev/null || true; fi
+          # Windows fallback via PowerShell if du unavailable
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "--- PowerShell Measure fallback ---"
+            powershell -NoProfile -Command "Get-ChildItem -Recurse dist -File -ErrorAction SilentlyContinue | Sort-Object Length -Descending | Select-Object -First 30 FullName, @{N='MB';E={[math]::Round(\$_.Length/1MB,2)}} | Format-Table -AutoSize; Write-Host ('Total: ' + [math]::Round(((Get-ChildItem -Recurse dist -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum/1MB),2) + ' MB')" || true
+          fi
+
+      - name: Package Windows Portable ZIP + Inno Setup installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${TAG:-${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}}"
+          TAG="${TAG#v}"
+          # Resolve standalone folder (Nuitka creates __main__.dist or similar)
+          STANDALONE_DIR="$(find dist -maxdepth 1 -type d -name "*.dist" | head -n1)"
+          if [[ -z "$STANDALONE_DIR" ]]; then
+            echo "ERROR: no .dist folder found in dist/ — listing dist:"
+            ls -R dist || true
+            exit 1
+          fi
+          echo "Standalone dir: $STANDALONE_DIR"
+          # Normalize exe name inside standalone dir for installer
+          # Nuitka standalone main is __main__.exe on Windows
+          if [[ -f "$STANDALONE_DIR/__main__.exe" && ! -f "$STANDALONE_DIR/ProxmoxWidget.exe" ]]; then
+            cp "$STANDALONE_DIR/__main__.exe" "$STANDALONE_DIR/ProxmoxWidget.exe" || true
+          fi
+          PORTABLE_ZIP="dist/ProxmoxWidget-${TAG}-Windows-x64-Portable.zip"
+          echo "Creating Portable ZIP: $PORTABLE_ZIP"
+          if command -v 7z >/dev/null 2>&1; then
+            7z a -tzip "$PORTABLE_ZIP" "./$STANDALONE_DIR/*" -mx=9
+          elif command -v zip >/dev/null 2>&1; then
+            (cd dist && zip -r "../$PORTABLE_ZIP" "$(basename "$STANDALONE_DIR")")
+          else
+            powershell -NoProfile -Command "Compress-Archive -Path '$STANDALONE_DIR/*' -DestinationPath '$PORTABLE_ZIP' -Force" || \
+            python -c "import zipfile, pathlib; d=pathlib.Path('$STANDALONE_DIR'); z=zipfile.ZipFile('$PORTABLE_ZIP','w',zipfile.ZIP_DEFLATED); [z.write(p, p.relative_to(d.parent)) for p in d.rglob('*') if p.is_file()]; z.close(); print('zip via python done')"
+          fi
+          ls -lh "$PORTABLE_ZIP" || true
+          # Inno Setup installer (iscc) — build Setup.exe via scripts/innosetup.iss
+          SETUP_EXE="dist/ProxmoxWidget-${TAG}-Windows-x64-Setup.exe"
+          if command -v iscc >/dev/null 2>&1; then
+            echo "iscc found — building installer"
+            # Pass version + standalone dir via defines; ISS uses {#MyAppVersion} and {#SourceDir}
+            iscc //DMyAppVersion="$TAG" //DSourceDir="$STANDALONE_DIR" //F"ProxmoxWidget-${TAG}-Windows-x64-Setup" //O"dist" scripts/innosetup.iss || \
+            iscc /DMyAppVersion="$TAG" /DSourceDir="$STANDALONE_DIR" /F"ProxmoxWidget-${TAG}-Windows-x64-Setup" /O"dist" scripts/innosetup.iss
+            ls -lh dist/*.exe || true
+          else
+            echo "iscc not available on this runner — skipping Setup.exe (fallback echo). Install Inno Setup to enable installer build."
+            echo "To build locally: choco install innosetup  &&  iscc scripts/innosetup.iss"
+            # Create placeholder note so artifact step still succeeds without error
+            echo "Inno Setup (iscc) not found — Setup.exe not built on this runner" > dist/INNOSETUP-NOT-BUILT.txt || true
+          fi
+          ls -lh dist/ || true
+
+      - name: Package Linux tar.gz
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${TAG:-${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}}"
+          TAG="${TAG#v}"
+          STANDALONE_DIR="$(find dist -maxdepth 1 -type d -name "*.dist" | head -n1)"
+          if [[ -z "$STANDALONE_DIR" ]]; then
+            echo "ERROR: no .dist folder in dist"; ls -R dist; exit 1
+          fi
+          echo "Standalone dir: $STANDALONE_DIR"
+          # Normalize binary name
+          if [[ -f "$STANDALONE_DIR/__main__.bin" && ! -f "$STANDALONE_DIR/ProxmoxWidget" ]]; then
+            cp "$STANDALONE_DIR/__main__.bin" "$STANDALONE_DIR/ProxmoxWidget" || true
+          fi
+          if [[ -f "$STANDALONE_DIR/__main__" && ! -f "$STANDALONE_DIR/ProxmoxWidget" ]]; then
+            cp "$STANDALONE_DIR/__main__" "$STANDALONE_DIR/ProxmoxWidget" || true
+          fi
+          TAR="dist/ProxmoxWidget-${TAG}-Linux-x64.tar.gz"
+          echo "Creating $TAR"
+          tar czf "$TAR" -C dist "$(basename "$STANDALONE_DIR")"
+          ls -lh "$TAR" || true
+
+      - name: Package macOS dmg / tar.gz
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${TAG:-${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}}"
+          TAG="${TAG#v}"
+          ls -R dist || true
+          # Nuitka --macos-create-app-bundle produces .app inside dist
+          APP_BUNDLE="$(find dist -maxdepth 2 -name "*.app" -type d | head -n1 || true)"
+          STANDALONE_DIR="$(find dist -maxdepth 1 -type d -name "*.dist" | head -n1 || true)"
+          if [[ -n "$APP_BUNDLE" ]]; then
+            echo "Found app bundle: $APP_BUNDLE"
+            DMG="dist/ProxmoxWidget-${TAG}-macOS-x64.dmg"
+            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
+            # Try to create dmg via hdiutil, fallback to tar.gz
+            if command -v hdiutil >/dev/null 2>&1; then
+              echo "Creating DMG via hdiutil"
+              hdiutil create -volname "ProxmoxWidget ${TAG}" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG" || \
+              tar czf "$TAR" -C dist "$(basename "$APP_BUNDLE")"
+            else
+              tar czf "$TAR" -C dist "$(basename "$APP_BUNDLE")"
+            fi
+          elif [[ -n "$STANDALONE_DIR" ]]; then
+            echo "No .app bundle, packaging standalone dir: $STANDALONE_DIR"
+            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
+            tar czf "$TAR" -C dist "$(basename "$STANDALONE_DIR")"
+          else
+            echo "WARNING: neither .app nor .dist found — packaging whatever is in dist"
+            TAR="dist/ProxmoxWidget-${TAG}-macOS-x64.tar.gz"
+            tar czf "$TAR" -C dist . || true
+          fi
+          ls -lh dist/*.dmg dist/*.tar.gz 2>/dev/null || ls -lh dist/ || true
 
       - name: Generate SHA256
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          if command -v sha256sum >/dev/null 2>&1; then
-            sha256sum "${{ matrix.output-file }}" > "${{ matrix.output-file }}.sha256"
-          elif command -v shasum >/dev/null 2>&1; then
-            shasum -a 256 "${{ matrix.output-file }}" > "${{ matrix.output-file }}.sha256"
+          rm -f SHA256SUMS.txt
+          echo "=== Hashing dist contents ==="
+          for f in *.zip *.exe *.tar.gz *.dmg *.bin 2>/dev/null; do
+            [[ -f "$f" ]] || continue
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$f" >> SHA256SUMS.txt
+              sha256sum "$f" > "$f.sha256"
+            elif command -v shasum >/dev/null 2>&1; then
+              shasum -a 256 "$f" >> SHA256SUMS.txt
+              shasum -a 256 "$f" > "$f.sha256"
+            else
+              python -c "import hashlib,pathlib; p=pathlib.Path('$f'); h=hashlib.sha256(p.read_bytes()).hexdigest(); open(f'$f.sha256','w').write(f'{h}  $f\n'); open('SHA256SUMS.txt','a').write(f'{h}  $f\n')"
+            fi
+            cat "$f.sha256" || true
+          done
+          # Also hash any .dist internal? No — only distributables
+          if [[ -f SHA256SUMS.txt ]]; then
+            cat SHA256SUMS.txt
           else
-            python -c "import hashlib,pathlib; p=pathlib.Path('${{ matrix.output-file }}'); h=hashlib.sha256(p.read_bytes()).hexdigest(); open(f'${{ matrix.output-file }}.sha256','w').write(f'{h}  ${{ matrix.output-file }}\n')"
+            echo "No distributables hashed — listing dist:"
+            ls -lh || true
           fi
-          cat "${{ matrix.output-file }}.sha256"
-          # Combined checksums for release job
-          cat "${{ matrix.output-file }}.sha256" >> SHA256SUMS.txt || true
-          cat SHA256SUMS.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            dist/${{ matrix.output-file }}
-            dist/${{ matrix.output-file }}.sha256
+            dist/*.zip
+            dist/*.exe
+            dist/*.tar.gz
+            dist/*.dmg
+            dist/*.sha256
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -138,14 +323,11 @@ jobs:
       - name: Combine SHA256SUMS
         run: |
           set -euo pipefail
-          # Each build produced a .sha256; combine into one file
           find artifacts -name "*.sha256" -exec cat {} \; > SHA256SUMS.txt || true
-          # Fallback: if per-file sha missing, hash whatever binaries exist
           if [ ! -s SHA256SUMS.txt ]; then
-            find artifacts -type f \( -name "*.exe" -o -name "*.bin" \) -exec sha256sum {} \; > SHA256SUMS.txt || true
+            find artifacts -type f \( -name "*.zip" -o -name "*.exe" -o -name "*.tar.gz" -o -name "*.dmg" \) -exec sha256sum {} \; > SHA256SUMS.txt || true
           fi
           cat SHA256SUMS.txt || echo "no checksums"
-          # Copy combined file into artifacts root for release upload
           cp SHA256SUMS.txt artifacts/SHA256SUMS.txt || true
           ls -lh artifacts/
 
@@ -154,9 +336,16 @@ jobs:
         with:
           generate_release_notes: true
           files: |
+            artifacts/*.zip
             artifacts/*.exe
-            artifacts/*.bin
+            artifacts/*.tar.gz
+            artifacts/*.dmg
             artifacts/*.sha256
             artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append to notepad
+        run: |
+          echo "Release ${{ github.ref_name }} built with Nuitka --standalone (no --onefile), Portable ZIP + Inno Setup, tar.gz/dmg" >> notepad.txt || true
+          cat notepad.txt || true
