@@ -4,7 +4,7 @@ import asyncio
 import sys
 
 from loguru import logger
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
@@ -88,8 +88,13 @@ class ProxmoxWidgetApp:
             screen = self.app.primaryScreen()
             if screen:
                 avail = screen.availableGeometry()
-                x = min(max(pos.x() - geo.width() // 2, avail.x() + 8), avail.right() - geo.width() - 8)
-                y = min(max(pos.y() - geo.height() - 20, avail.y() + 8), avail.bottom() - geo.height() - 8)
+                x = min(
+                    max(pos.x() - geo.width() // 2, avail.x() + 8), avail.right() - geo.width() - 8
+                )
+                y = min(
+                    max(pos.y() - geo.height() - 20, avail.y() + 8),
+                    avail.bottom() - geo.height() - 8,
+                )
                 self.dashboard.move(x, y)
         except Exception:
             pass
@@ -163,8 +168,18 @@ class ProxmoxWidgetApp:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
         if not cluster:
             return
-        proxmox_action = {"start": "start", "stop": "stop", "reboot": "reboot", "shutdown": "shutdown"}.get(action, action)
-        want_map = {"start": "running", "stop": "stopped", "shutdown": "stopped", "reboot": "running"}
+        proxmox_action = {
+            "start": "start",
+            "stop": "stop",
+            "reboot": "reboot",
+            "shutdown": "shutdown",
+        }.get(action, action)
+        want_map = {
+            "start": "running",
+            "stop": "stopped",
+            "shutdown": "stopped",
+            "reboot": "running",
+        }
         want = want_map.get(proxmox_action, "running")
 
         self.dashboard.set_busy(cluster_id, vmid, is_lxc, proxmox_action)
@@ -175,13 +190,17 @@ class ProxmoxWidgetApp:
             try:
                 upid = await client.vm_action(node, vmid, proxmox_action, is_lxc=is_lxc)
                 logger.info("action {} {} -> {}", proxmox_action, vmid, upid)
-                self.dashboard.show_message(f"{proxmox_action} sent → waiting for {want}…", "info", 2500)
+                self.dashboard.show_message(
+                    f"{proxmox_action} sent → waiting for {want}…", "info", 2500
+                )
                 ok = await client.wait_for_guest(node, vmid, want, is_lxc=is_lxc, timeout=45)
                 if ok:
                     self.dashboard.show_message(f"✓ {vmid} is now {want}", "success", 3000)
                 else:
                     full = await client.get_guest_status(node, vmid, is_lxc=is_lxc)
-                    self.dashboard.show_message(f"{vmid} status: {full} (want {want})", "warning", 4000)
+                    self.dashboard.show_message(
+                        f"{vmid} status: {full} (want {want})", "warning", 4000
+                    )
             except Exception as e:
                 logger.error("action failed: {}", e)
                 self.dashboard.show_message(f"✕ {action} failed: {str(e)[:180]}", "error", 5000)

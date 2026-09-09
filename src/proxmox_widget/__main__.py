@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import sys
 import pathlib
+import sys
 
 from loguru import logger
 from platformdirs import user_log_dir
@@ -12,7 +12,11 @@ from proxmox_widget.app import create_app
 
 def _setup_logging() -> None:
     logger.remove()
-    dev = "--dev" in sys.argv or "--console" in sys.argv or os.environ.get("PROXMOX_WIDGET_DEV") == "1"
+    dev = (
+        "--dev" in sys.argv
+        or "--console" in sys.argv
+        or os.environ.get("PROXMOX_WIDGET_DEV") == "1"
+    )
     if dev:
         logger.add(sys.stderr, level="INFO")
         return

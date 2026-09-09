@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ThemeMode(str, Enum):
@@ -32,7 +32,9 @@ class ClusterConfig(BaseModel):
     verify_ssl: bool = Field(default=False, description="Verify TLS; false for self-signed")
     auth_mode: AuthMode = Field(default=AuthMode.TOKEN)
     token_id: str = Field(default="", description="Full token id e.g. 'root@pam!widget'")
-    username: str = Field(default="root@pam", description="Username for password auth, e.g. root@pam")
+    username: str = Field(
+        default="root@pam", description="Username for password auth, e.g. root@pam"
+    )
 
     @field_validator("host")
     @classmethod

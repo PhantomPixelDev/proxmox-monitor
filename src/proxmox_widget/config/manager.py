@@ -113,15 +113,15 @@ def remove_cluster(settings: AppSettings, cluster_id: str) -> AppSettings:
 
 __all__ = [
     "APP_NAME",
-    "load_settings",
-    "save_settings",
-    "set_cluster_secret",
-    "set_cluster_token",
-    "set_cluster_password",
-    "get_cluster_secret",
-    "get_cluster_token",
+    "add_or_update_cluster",
     "delete_cluster_secret",
     "delete_cluster_token",
-    "add_or_update_cluster",
+    "get_cluster_secret",
+    "get_cluster_token",
+    "load_settings",
     "remove_cluster",
+    "save_settings",
+    "set_cluster_password",
+    "set_cluster_secret",
+    "set_cluster_token",
 ]

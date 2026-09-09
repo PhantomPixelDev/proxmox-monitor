@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from loguru import logger
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QSystemTrayIcon
-from loguru import logger
 
 from proxmox_widget.config.models import ClusterHealth
 

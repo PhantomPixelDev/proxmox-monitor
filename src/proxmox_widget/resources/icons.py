@@ -25,7 +25,9 @@ def make_app_icon(size: int = 256) -> QIcon:
     p.setBrush(QBrush(QColor(255, 255, 255, 18)))
     p.drawRoundedRect(bg_rect.adjusted(1, 1, -1, -size // 2), r, r)
     # server stack icon
-    p.setPen(QPen(QColor("#ffffff"), max(2, size // 64), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    p.setPen(
+        QPen(QColor("#ffffff"), max(2, size // 64), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+    )
     p.setBrush(Qt.BrushStyle.NoBrush)
     # 3 stacked servers
     cx = size // 2

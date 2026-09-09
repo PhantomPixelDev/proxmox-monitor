@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -137,7 +137,9 @@ class SettingsDialog(QDialog):
         lay.addWidget(grp2)
 
         # dialog buttons
-        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
         box.accepted.connect(self._on_save_all)
         box.rejected.connect(self.reject)
         lay.addWidget(box)
@@ -169,7 +171,9 @@ class SettingsDialog(QDialog):
         self.ed_token_id.setText(c.token_id)
         secret = get_cluster_secret(c.id) or ""
         self.ed_secret.setText(secret)
-        self.lbl_cluster_hint.setText(f"Editing {c.id} — secrets loaded from keyring" if secret else "")
+        self.lbl_cluster_hint.setText(
+            f"Editing {c.id} — secrets loaded from keyring" if secret else ""
+        )
 
     def _update_auth_fields(self) -> None:
         is_token = self.combo_auth.currentIndex() == 0
@@ -220,7 +224,9 @@ class SettingsDialog(QDialog):
         token_id = self.ed_token_id.text().strip()
         username = self.ed_user.text().strip() or "root@pam"
         if is_token and not token_id:
-            QMessageBox.warning(self, "Missing Token ID", "Token ID like root@pam!widget required for token auth")
+            QMessageBox.warning(
+                self, "Missing Token ID", "Token ID like root@pam!widget required for token auth"
+            )
             return
         cfg = ClusterConfig(
             id=cid,

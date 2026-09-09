@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Callable
+from collections.abc import Callable
 
 from loguru import logger
-from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from proxmox_widget.api.client import ProxmoxClient
 from proxmox_widget.config.models import ClusterHealth
@@ -19,7 +19,9 @@ class Monitor(QObject):
     health_updated = Signal(list)  # list[ClusterHealth]
     error_occurred = Signal(str)
 
-    def __init__(self, get_clusters_callable: Callable[[], list], interval_seconds: int = 30) -> None:
+    def __init__(
+        self, get_clusters_callable: Callable[[], list], interval_seconds: int = 30
+    ) -> None:
         super().__init__()
         self._get_clusters = get_clusters_callable
         self._interval = max(5, interval_seconds)

@@ -29,7 +29,9 @@ class TrayManager(QObject):
 
     def _build_menu(self) -> None:
         m = QMenu()
-        m.setStyleSheet("QMenu { padding: 6px; } QMenu::item { padding: 7px 18px 7px 14px; border-radius: 6px; } QMenu::item:selected { background: #34374e; } QMenu::separator { height: 1px; background: #3a3d53; margin: 6px 8px; }")
+        m.setStyleSheet(
+            "QMenu { padding: 6px; } QMenu::item { padding: 7px 18px 7px 14px; border-radius: 6px; } QMenu::item:selected { background: #34374e; } QMenu::separator { height: 1px; background: #3a3d53; margin: 6px 8px; }"
+        )
         self.act_show = QAction("🖥  Show Dashboard", m)
         self.act_show.triggered.connect(lambda: self.show_dashboard.emit())
         m.addAction(self.act_show)

@@ -7,7 +7,15 @@ import httpx
 from loguru import logger
 
 from proxmox_widget.config.manager import get_cluster_secret
-from proxmox_widget.config.models import AuthMode, ClusterConfig, ClusterHealth, LxcContainer, ProxmoxNode, QemuVm, StorageStatus
+from proxmox_widget.config.models import (
+    AuthMode,
+    ClusterConfig,
+    ClusterHealth,
+    LxcContainer,
+    ProxmoxNode,
+    QemuVm,
+    StorageStatus,
+)
 
 from .exceptions import ActionFailedError, AuthError, ConnectionError
 
@@ -57,7 +65,9 @@ class ProxmoxClient:
             raise AuthError(f"[{self.cluster.id}] no password in keyring")
         url = f"{self.cluster.base_url}/api2/json/access/ticket"
         async with httpx.AsyncClient(verify=self.cluster.verify_ssl, timeout=10.0) as c:
-            resp = await c.post(url, data={"username": self.cluster.username, "password": self._secret})
+            resp = await c.post(
+                url, data={"username": self.cluster.username, "password": self._secret}
+            )
             if resp.status_code in (401, 403):
                 raise AuthError(f"[{self.cluster.id}] ticket login failed: {resp.text[:200]}")
             resp.raise_for_status()
@@ -218,7 +228,9 @@ class ProxmoxClient:
                 error=str(e),
             )
 
-        async def _for_node(n: ProxmoxNode) -> tuple[list[QemuVm], list[LxcContainer], list[StorageStatus]]:
+        async def _for_node(
+            n: ProxmoxNode,
+        ) -> tuple[list[QemuVm], list[LxcContainer], list[StorageStatus]]:
             if n.status != "online":
                 return [], [], []
             vms: list[QemuVm] = []
@@ -291,7 +303,9 @@ class ProxmoxClient:
         except Exception:
             return "unknown"
 
-    async def wait_for_guest(self, node: str, vmid: int, want: str, is_lxc: bool = False, timeout: float = 45.0) -> bool:
+    async def wait_for_guest(
+        self, node: str, vmid: int, want: str, is_lxc: bool = False, timeout: float = 45.0
+    ) -> bool:
         deadline = asyncio.get_event_loop().time() + timeout
         want = want.lower()
         while asyncio.get_event_loop().time() < deadline:

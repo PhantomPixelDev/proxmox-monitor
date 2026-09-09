@@ -19,3 +19,8 @@ ruff_cache/
 Thumbs.db
 *.log
 config.json
+
+.omo/
+resources/app.ico
+resources/app.png
+resources/app.svg
