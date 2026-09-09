@@ -10,11 +10,18 @@ QWidget {
 }
 QWidget#root { background: #1e1e2e; }
 
-/* cards */
+/* cards — high-contrast, clearly separated */
 QFrame#card {
-    background: #25273d;
-    border: 1px solid #3a3d53;
+    background: #2b2e4a;
+    border: 1.5px solid #5a5e85;
     border-radius: 12px;
+}
+QFrame#card:hover { border-color: #6d72a3; }
+QFrame#cardHeader {
+    background: #32365a;
+    border-bottom: 1px solid #4a4e7a;
+    border-top-left-radius: 11px;
+    border-top-right-radius: 11px;
 }
 
 /* typography */
@@ -141,8 +148,14 @@ QWidget#root { background: #eff1f5; }
 
 QFrame#card {
     background: #ffffff;
-    border: 1px solid #dce0ec;
+    border: 1.5px solid #c8cde0;
     border-radius: 12px;
+}
+QFrame#cardHeader {
+    background: #f2f4f9;
+    border-bottom: 1px solid #d8dce9;
+    border-top-left-radius: 11px;
+    border-top-right-radius: 11px;
 }
 
 QLabel#title { font-size: 16px; font-weight: 700; color: #4c4f69; }

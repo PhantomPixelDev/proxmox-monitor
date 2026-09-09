@@ -233,6 +233,18 @@ class Dashboard(QWidget):
     def _card(self, parent_layout: QVBoxLayout) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame()
         card.setObjectName("card")
+        try:
+            from PySide6.QtWidgets import QGraphicsDropShadowEffect
+
+            from PySide6.QtGui import QColor
+
+            eff = QGraphicsDropShadowEffect(card)
+            eff.setBlurRadius(18)
+            eff.setOffset(0, 6)
+            eff.setColor(QColor(0, 0, 0, 80))
+            card.setGraphicsEffect(eff)
+        except Exception:
+            pass
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(8)
