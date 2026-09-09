@@ -1,0 +1,130 @@
+{
+  "cluster_id": "pve-192-168-10-2",
+  "cluster_name": "pve-01 (least-priv)",
+  "online": true,
+  "error": null,
+  "nodes": [
+    {
+      "node": "pve",
+      "status": "online",
+      "cpu": 0.00812807881773399,
+      "maxcpu": 4,
+      "mem": 2642325504,
+      "maxmem": 16650981376,
+      "disk": 31152168960,
+      "maxdisk": 100861726720,
+      "uptime": 74471,
+      "pve_version": null
+    }
+  ],
+  "vms": [
+    {
+      "vmid": 100,
+      "name": "parrot-001",
+      "node": "pve",
+      "status": "stopped",
+      "cpus": 4,
+      "cpu": 0.0,
+      "mem": 0,
+      "maxmem": 8438939648,
+      "disk": 0,
+      "maxdisk": 85899345920,
+      "uptime": 0,
+      "template": false
+    },
+    {
+      "vmid": 122,
+      "name": "openclaw-led-bussiness",
+      "node": "pve",
+      "status": "stopped",
+      "cpus": 4,
+      "cpu": 0.0,
+      "mem": 0,
+      "maxmem": 8388608000,
+      "disk": 0,
+      "maxdisk": 137438953472,
+      "uptime": 0,
+      "template": false
+    },
+    {
+      "vmid": 101,
+      "name": "portfolio",
+      "node": "pve",
+      "status": "stopped",
+      "cpus": 4,
+      "cpu": 0.0,
+      "mem": 0,
+      "maxmem": 8438939648,
+      "disk": 0,
+      "maxdisk": 68719476736,
+      "uptime": 0,
+      "template": false
+    },
+    {
+      "vmid": 112,
+      "name": "win10",
+      "node": "pve",
+      "status": "stopped",
+      "cpus": 4,
+      "cpu": 0.0,
+      "mem": 0,
+      "maxmem": 8489271296,
+      "disk": 0,
+      "maxdisk": 137438953472,
+      "uptime": 0,
+      "template": false
+    }
+  ],
+  "containers": [
+    {
+      "vmid": 107,
+      "name": "docker",
+      "node": "pve",
+      "status": "running",
+      "cpus": 2,
+      "cpu": 0.0482414273349952,
+      "mem": 771153920,
+      "maxmem": 4294967296,
+      "disk": 6251966464,
+      "maxdisk": 52521566208,
+      "uptime": 3489
+    },
+    {
+      "vmid": 150,
+      "name": "changeproof-test",
+      "node": "pve",
+      "status": "running",
+      "cpus": 1,
+      "cpu": 0.00016419191813485,
+      "mem": 35291136,
+      "maxmem": 1073741824,
+      "disk": 739733504,
+      "maxdisk": 8350298112,
+      "uptime": 3272
+    }
+  ],
+  "storages": [
+    {
+      "storage": "local-lvm",
+      "node": "pve",
+      "type": "lvmthin",
+      "status": "unknown",
+      "total": 875485462528,
+      "used": 149007625722,
+      "avail": 726477836806,
+      "enabled": true,
+      "shared": false
+    },
+    {
+      "storage": "local",
+      "node": "pve",
+      "type": "dir",
+      "status": "unknown",
+      "total": 100861726720,
+      "used": 31152168960,
+      "avail": 64538820608,
+      "enabled": true,
+      "shared": false
+    }
+  ]
+}
