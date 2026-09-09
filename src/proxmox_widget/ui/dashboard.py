@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QByteArray, Qt, Signal
+from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -13,6 +14,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+try:
+    from PySide6.QtSvg import QSvgRenderer
+except ImportError:
+    QSvgRenderer = None  # type: ignore
+
 from proxmox_widget.config.models import ClusterHealth
 from proxmox_widget.resources.icons import make_app_icon
 from proxmox_widget.utils.format import fmt_bytes, fmt_uptime
@@ -23,11 +29,6 @@ ICONS = {
     "vm": "🖥️",
     "ct": "📦",
     "storage": "💾",
-    "cpu": "⚡",
-    "ram": "🧠",
-    "disk": "💽",
-    "uptime": "⏱️",
-    "status": "●",
     "net": "🌐",
     "health": "💚",
     "warn": "⚠️",
@@ -35,6 +36,51 @@ ICONS = {
     "online": "🟢",
     "paused": "🟡",
 }
+
+# per-metric inline SVG templates — stroke 1.8, currentColor, 14-16px
+_SVG_ICONS: dict[str, str] = {
+    "cpu": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4.3" y="4.3" width="7.4" height="7.4" rx="1.2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 1.6v2.1M10 1.6v2.1M6 12.3v2.1M10 12.3v2.1M1.6 6h2.1M1.6 10h2.1M12.3 6h2.1M12.3 10h2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="6.7" y="6.7" width="2.6" height="2.6" rx="0.4" stroke="currentColor" stroke-width="1.4"/></svg>',
+    "ram": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.4" y="3.2" width="11.2" height="9.6" rx="1.4" stroke="currentColor" stroke-width="1.8"/><path d="M5.2 5.2v5.6M8 5.2v5.6M10.8 5.2v5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.4 7.2h11.2M2.4 9.8h11.2" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.9"/><circle cx="8" cy="12.8" r="0.6" fill="currentColor"/></svg>',
+    "disk": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="8" cy="4.8" rx="5" ry="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M3 4.8v6.9c0 1.33 2.24 2.4 5 2.4s5-1.07 5-2.4V4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="8" cy="11.7" rx="5" ry="2.4" stroke="currentColor" stroke-width="1.8"/><path d="M3 8.2c0 1.33 2.24 2.4 5 2.4s5-1.07 5-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/></svg>',
+    "status": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="3.2" fill="currentColor" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.2" opacity="0.25"/></svg>',
+    "uptime": '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="5.4" stroke="currentColor" stroke-width="1.8"/><path d="M8 5.4v3.1l2.2 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+}
+
+
+def _icon_svg(name: str, size: int = 14) -> QLabel:
+    """Return QLabel with crisp inline SVG icon — stroke 1.8, currentColor, 14-16px."""
+    lbl = QLabel()
+    lbl.setFixedSize(size, size)
+    lbl.setStyleSheet("background: transparent;")
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    svg = _SVG_ICONS.get(name, _SVG_ICONS["status"])
+    color = "#8d91b0"
+    svg_colored = svg.replace("currentColor", color)
+    if QSvgRenderer is not None:
+        try:
+            dpr = lbl.devicePixelRatioF()
+            if dpr is None or dpr < 1.0:
+                dpr = 2.0
+            # ensure at least 2x for retina crispness
+            if dpr < 1.5:
+                dpr = 2.0
+            px = max(1, int(size * dpr))
+            renderer = QSvgRenderer(QByteArray(svg_colored.encode("utf-8")))
+            pixmap = QPixmap(px, px)
+            pixmap.setDevicePixelRatio(dpr)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            renderer.render(painter)
+            painter.end()
+            lbl.setPixmap(pixmap)
+            return lbl
+        except Exception:
+            pass
+    # fallback: text dot if svg render unavailable
+    lbl.setText("·")
+    lbl.setStyleSheet("background: transparent; color: #8d91b0; font-size: 10px;")
+    return lbl
 
 
 class Dashboard(QWidget):
@@ -60,7 +106,7 @@ class Dashboard(QWidget):
 
     def _build(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 14)
+        root.setContentsMargins(20, 20, 20, 16)
         root.setSpacing(10)
         self._banner = QFrame()
         self._banner.setObjectName("banner")
@@ -140,7 +186,7 @@ class Dashboard(QWidget):
 
         for w in [self.tab_dashboard, self.tab_nodes, self.tab_vms, self.tab_cts, self.tab_storage]:
             lay = QVBoxLayout(w)
-            lay.setContentsMargins(2, 6, 2, 6)
+            lay.setContentsMargins(4, 8, 4, 8)
             lay.setSpacing(10)
             lay.addStretch()
 
@@ -254,15 +300,15 @@ class Dashboard(QWidget):
             from PySide6.QtWidgets import QGraphicsDropShadowEffect
 
             eff = QGraphicsDropShadowEffect(card)
-            eff.setBlurRadius(18)
-            eff.setOffset(0, 6)
-            eff.setColor(QColor(0, 0, 0, 80))
+            eff.setBlurRadius(24)
+            eff.setOffset(0, 8)
+            eff.setColor(QColor(0, 0, 0, 90))
             card.setGraphicsEffect(eff)
         except Exception:
             pass
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(14, 14, 14, 14)
-        lay.setSpacing(8)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(10)
         parent_layout.insertWidget(parent_layout.count() - 1, card)
         return card, lay
 
@@ -304,20 +350,19 @@ class Dashboard(QWidget):
             return
         for n in h.nodes:
             ndot = ICONS["online"] if n.status == "online" else ICONS["offline"]
-            line = QLabel(
-                f"{ndot}  {n.node}  ·  {ICONS['uptime']} {fmt_uptime(n.uptime)}  ·  {ICONS['cpu']} {n.maxcpu}c"
-            )
+            line = QLabel(f"{ndot}  {n.node}  ·  {fmt_uptime(n.uptime)}  ·  {n.maxcpu}c")
             line.setObjectName("muted")
             card_lay.addWidget(line)
-            for icon, label, val, oid in [
-                (ICONS["cpu"], "CPU", n.cpu, ""),
-                (ICONS["ram"], "RAM", n.mem / n.maxmem if n.maxmem else 0, "ram"),
-                (ICONS["disk"], "Disk", n.disk / n.maxdisk if n.maxdisk else 0, "disk"),
+            for name, label, val, oid in [
+                ("cpu", "CPU", n.cpu, ""),
+                ("ram", "RAM", n.mem / n.maxmem if n.maxmem else 0, "ram"),
+                ("disk", "Disk", n.disk / n.maxdisk if n.maxdisk else 0, "disk"),
             ]:
                 row = QHBoxLayout()
                 row.setSpacing(8)
-                lk = QLabel(f"{icon} {label}")
-                lk.setFixedWidth(58)
+                row.addWidget(_icon_svg(name, size=14), 0)
+                lk = QLabel(label)
+                lk.setFixedWidth(40)
                 lk.setObjectName("muted")
                 row.addWidget(lk)
                 bar = QProgressBar()
@@ -341,6 +386,19 @@ class Dashboard(QWidget):
             summ.setObjectName("muted")
             card_lay.addWidget(summ)
 
+    def _kv_with_svg(self, icon_name: str, label: str, value: str) -> QWidget:
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
+        lay.addWidget(_icon_svg(icon_name, size=14), 0)
+        lbl = QLabel(f"{label}  ·  {value}")
+        lbl.setObjectName("muted")
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        lbl.setWordWrap(True)
+        lay.addWidget(lbl, 1)
+        return w
+
     def _add_nodes(self, h: ClusterHealth) -> None:
         lay = self.tab_nodes.layout()
         assert isinstance(lay, QVBoxLayout)
@@ -348,21 +406,20 @@ class Dashboard(QWidget):
             _, cl = self._card(lay)
             color = "#2ecc71" if n.status == "online" else "#ff3b30"
             cl.addLayout(self._section_row(ICONS["node"], n.node, n.status.upper(), color))
-            sub = QLabel(
-                f"{ICONS['cluster']} {h.cluster_name}  ·  {ICONS['cpu']} {n.maxcpu}c  ·  {ICONS['uptime']} {fmt_uptime(n.uptime)}"
-            )
+            sub = QLabel(f"{ICONS['cluster']} {h.cluster_name}  ·  {n.maxcpu}c  ·  {fmt_uptime(n.uptime)}")
             sub.setObjectName("muted")
             cl.addWidget(sub)
-            for icon, label, used, total, oid in [
-                (ICONS["cpu"], "CPU", n.cpu, 1.0, ""),
-                (ICONS["ram"], "RAM", n.mem, n.maxmem, "ram"),
-                (ICONS["disk"], "Disk", n.disk, n.maxdisk, "disk"),
+            for name, label, used, total, oid in [
+                ("cpu", "CPU", n.cpu, 1.0, ""),
+                ("ram", "RAM", n.mem, n.maxmem, "ram"),
+                ("disk", "Disk", n.disk, n.maxdisk, "disk"),
             ]:
                 pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                 row = QHBoxLayout()
                 row.setSpacing(8)
-                lk = QLabel(f"{icon} {label}")
-                lk.setFixedWidth(58)
+                row.addWidget(_icon_svg(name, size=14), 0)
+                lk = QLabel(label)
+                lk.setFixedWidth(40)
                 lk.setObjectName("muted")
                 row.addWidget(lk)
                 bar = QProgressBar()
@@ -378,8 +435,8 @@ class Dashboard(QWidget):
                     det.setObjectName("muted")
                     det.setStyleSheet("font-size: 10.5px; margin-left: 66px;")
                     cl.addWidget(det)
-            cl.addWidget(self._kv(f"{ICONS['status']} Status", n.status))
-            cl.addWidget(self._kv(f"{ICONS['uptime']} Uptime", fmt_uptime(n.uptime)))
+            cl.addWidget(self._kv_with_svg("status", "Status", n.status))
+            cl.addWidget(self._kv_with_svg("uptime", "Uptime", fmt_uptime(n.uptime)))
 
     def _add_vms(self, h: ClusterHealth) -> None:
         lay = self.tab_vms.layout()
@@ -436,23 +493,25 @@ class Dashboard(QWidget):
             )
             status_txt = busy if busy else vm.status
             cl.addWidget(
-                self._kv(
-                    f"{ICONS['status']} Status",
+                self._kv_with_svg(
+                    "status",
+                    "Status",
                     f'<span style="color:{status_color}; font-weight:600;">{status_txt}</span>'
                     + ("  · template" if vm.template else ""),
                 )
             )
-            cl.addWidget(self._kv(f"{ICONS['cpu']} vCPUs", str(vm.cpus)))
+            cl.addWidget(self._kv_with_svg("cpu", "vCPUs", str(vm.cpus)))
             if vm.status == "running":
-                for icon, label, used, total, oid in [
-                    (ICONS["cpu"], "CPU", vm.cpu, 1.0, ""),
-                    (ICONS["ram"], "RAM", vm.mem, vm.maxmem, "ram"),
+                for name, label, used, total, oid in [
+                    ("cpu", "CPU", vm.cpu, 1.0, ""),
+                    ("ram", "RAM", vm.mem, vm.maxmem, "ram"),
                 ]:
                     pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                     row = QHBoxLayout()
                     row.setSpacing(8)
-                    lk = QLabel(f"{icon} {label}")
-                    lk.setFixedWidth(58)
+                    row.addWidget(_icon_svg(name, size=14), 0)
+                    lk = QLabel(label)
+                    lk.setFixedWidth(40)
                     lk.setObjectName("muted")
                     row.addWidget(lk)
                     bar = QProgressBar()
@@ -464,9 +523,9 @@ class Dashboard(QWidget):
                     row.addWidget(bar, 1)
                     cl.addLayout(row)
             else:
-                cl.addWidget(self._kv(f"{ICONS['cpu']} CPU", f"{vm.cpu * 100:.0f}%"))
+                cl.addWidget(self._kv_with_svg("cpu", "CPU", f"{vm.cpu * 100:.0f}%"))
                 cl.addWidget(
-                    self._kv(f"{ICONS['ram']} RAM", f"{fmt_bytes(vm.mem)} / {fmt_bytes(vm.maxmem)}")
+                    self._kv_with_svg("ram", "RAM", f"{fmt_bytes(vm.mem)} / {fmt_bytes(vm.maxmem)}")
                 )
             row = QHBoxLayout()
             row.setSpacing(6)
@@ -521,21 +580,23 @@ class Dashboard(QWidget):
             color = "#f9e2af" if busy else ("#2ecc71" if ct.status == "running" else "#ff3b30")
             status_txt = busy if busy else ct.status
             cl.addWidget(
-                self._kv(
-                    f"{ICONS['status']} Status",
+                self._kv_with_svg(
+                    "status",
+                    "Status",
                     f'<span style="color:{color}; font-weight:600;">{status_txt}</span>',
                 )
             )
             if ct.status == "running":
-                for icon, label, used, total, oid in [
-                    (ICONS["cpu"], "CPU", ct.cpu, 1.0, ""),
-                    (ICONS["ram"], "RAM", ct.mem, ct.maxmem, "ram"),
+                for name, label, used, total, oid in [
+                    ("cpu", "CPU", ct.cpu, 1.0, ""),
+                    ("ram", "RAM", ct.mem, ct.maxmem, "ram"),
                 ]:
                     pct = int(used * 100) if oid == "" else int(used / total * 100) if total else 0
                     row = QHBoxLayout()
                     row.setSpacing(8)
-                    lk = QLabel(f"{icon} {label}")
-                    lk.setFixedWidth(58)
+                    row.addWidget(_icon_svg(name, size=14), 0)
+                    lk = QLabel(label)
+                    lk.setFixedWidth(40)
                     lk.setObjectName("muted")
                     row.addWidget(lk)
                     bar = QProgressBar()
@@ -548,7 +609,7 @@ class Dashboard(QWidget):
                     cl.addLayout(row)
             else:
                 cl.addWidget(
-                    self._kv(f"{ICONS['ram']} RAM", f"{fmt_bytes(ct.mem)} / {fmt_bytes(ct.maxmem)}")
+                    self._kv_with_svg("ram", "RAM", f"{fmt_bytes(ct.mem)} / {fmt_bytes(ct.maxmem)}")
                 )
             row = QHBoxLayout()
             row.setSpacing(6)
@@ -570,16 +631,27 @@ class Dashboard(QWidget):
         for s in h.storages:
             _, cl = self._card(lay)
             cl.addLayout(self._section_row(ICONS["storage"], s.storage, s.type.upper()))
-            sub = QLabel(
-                f"{ICONS['node']} {s.node}  ·  {ICONS['status']} {s.status}  ·  {'🔗 shared' if s.shared else '📌 local'}"
-            )
-            sub.setObjectName("muted")
-            cl.addWidget(sub)
+            sub_row = QHBoxLayout()
+            sub_row.setSpacing(6)
+            # node icon keeps emoji, status uses SVG
+            node_lbl = QLabel(f"{ICONS['node']} {s.node}")
+            node_lbl.setObjectName("muted")
+            sub_row.addWidget(node_lbl, 0)
+            sub_row.addWidget(_icon_svg("status", size=12), 0)
+            status_lbl = QLabel(s.status)
+            status_lbl.setObjectName("muted")
+            sub_row.addWidget(status_lbl, 0)
+            shared_lbl = QLabel("shared" if s.shared else "local")
+            shared_lbl.setObjectName("muted")
+            sub_row.addWidget(shared_lbl, 0)
+            sub_row.addStretch(1)
+            cl.addLayout(sub_row)
             used_pct = (s.used / s.total * 100) if s.total else 0
             row = QHBoxLayout()
             row.setSpacing(8)
-            lk = QLabel(f"{ICONS['disk']} Use")
-            lk.setFixedWidth(58)
+            row.addWidget(_icon_svg("disk", size=14), 0)
+            lk = QLabel("Use")
+            lk.setFixedWidth(40)
             lk.setObjectName("muted")
             row.addWidget(lk)
             bar = QProgressBar()
