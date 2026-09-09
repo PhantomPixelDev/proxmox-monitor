@@ -57,7 +57,32 @@ class Dashboard(QWidget):
     def _build(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 14)
-        root.setSpacing(12)
+        root.setSpacing(10)
+        self._banner = QFrame()
+        self._banner.setObjectName("banner")
+        self._banner.setVisible(False)
+        self._banner.setStyleSheet("QFrame#banner { background: #2a2d45; border: 1px solid #3a3d53; border-radius: 8px; }")
+        bl = QHBoxLayout(self._banner)
+        bl.setContentsMargins(10, 8, 10, 8)
+        bl.setSpacing(8)
+        self._banner_icon = QLabel()
+        self._banner_icon.setFixedWidth(18)
+        bl.addWidget(self._banner_icon, 0)
+        self._banner_label = QLabel()
+        self._banner_label.setWordWrap(True)
+        self._banner_label.setStyleSheet("font-size: 12px; font-weight: 500;")
+        bl.addWidget(self._banner_label, 1)
+        self._banner_close = QPushButton("✕")
+        self._banner_close.setFixedSize(22, 22)
+        self._banner_close.setObjectName("ghost")
+        self._banner_close.setStyleSheet("font-size: 11px; padding: 0px;")
+        self._banner_close.clicked.connect(lambda: self._banner.setVisible(False))
+        bl.addWidget(self._banner_close, 0)
+        root.addWidget(self._banner)
+        from PySide6.QtCore import QTimer as _QTimer
+        self._banner_timer = _QTimer(self)
+        self._banner_timer.setSingleShot(True)
+        self._banner_timer.timeout.connect(lambda: self._banner.setVisible(False))
 
         header = QHBoxLayout()
         header.setSpacing(10)
@@ -163,8 +188,19 @@ class Dashboard(QWidget):
         self._busy.clear()
         self.update_health(self._health)
 
+    def show_message(self, text: str, kind: str = "info", duration_ms: int = 4000) -> None:
+        colors = {"info": ("#89b4fa", "ℹ️"), "success": ("#a6e3a1", "✓"), "warning": ("#f9e2af", "⚠️"), "error": ("#f38ba8", "✕")}
+        color, icon = colors.get(kind, ("#89b4fa", "ℹ️"))
+        self._banner_icon.setText(icon)
+        self._banner_icon.setStyleSheet(f"color: {color}; font-weight: 700;")
+        self._banner_label.setText(text)
+        self._banner_label.setStyleSheet(f"color: #cdd6f4; font-size: 12px;")
+        self._banner.setStyleSheet(f"QFrame#banner {{ background: #2a2d45; border: 1px solid {color}; border-radius: 8px; }}")
+        self._banner.setVisible(True)
+        self._banner_timer.start(duration_ms)
+
     def _placeholder_refresh(self) -> None:
-        self.lbl_status.setText("Refreshing…")
+        self.show_message("Refreshing…", "info", 1500)
 
     def update_health(self, health: list[ClusterHealth]) -> None:
         self._health = health

@@ -55,9 +55,14 @@ class ProxmoxWidgetApp:
         self.dashboard.open_settings.connect(self.show_settings)
         self.dashboard.open_proxmox_requested.connect(self._open_proxmox)
         self.dashboard.action_requested.connect(self._on_action)
-        self.notifier.notification_requested.connect(lambda t, m: logger.info("notify {} {}", t, m))
+        self.notifier.notification_requested.connect(self._on_notify)
         self.tray.set_clusters(self.settings.clusters)
         self.dashboard.set_clusters(self.settings.clusters)
+
+    def _on_notify(self, title: str, msg: str) -> None:
+        kind = "warning" if "offline" in title.lower() or "stopped" in title.lower() else "info"
+        self.dashboard.show_message(f"{title} — {msg}", kind, 5000)
+        logger.info("notify {} {}", title, msg)
 
     def _apply_theme(self) -> None:
         qss = qss_for(self.settings.theme.value)
@@ -163,23 +168,23 @@ class ProxmoxWidgetApp:
         want = want_map.get(proxmox_action, "running")
 
         self.dashboard.set_busy(cluster_id, vmid, is_lxc, proxmox_action)
-        self.tray.tray.showMessage("ProxmoxWidget", f"{proxmox_action} {vmid} on {node}…", QSystemTrayIcon.MessageIcon.Information, 2000)
+        self.dashboard.show_message(f"{proxmox_action} {vmid} on {node}…", "info", 2000)
 
         async def _do() -> None:
             client = ProxmoxClient(cluster)
             try:
                 upid = await client.vm_action(node, vmid, proxmox_action, is_lxc=is_lxc)
                 logger.info("action {} {} -> {}", proxmox_action, vmid, upid)
-                self.tray.tray.showMessage("ProxmoxWidget", f"{proxmox_action} sent → waiting for {want}…", QSystemTrayIcon.MessageIcon.Information, 2500)
+                self.dashboard.show_message(f"{proxmox_action} sent → waiting for {want}…", "info", 2500)
                 ok = await client.wait_for_guest(node, vmid, want, is_lxc=is_lxc, timeout=45)
                 if ok:
-                    self.tray.tray.showMessage("ProxmoxWidget ✓", f"{vmid} is now {want}", QSystemTrayIcon.MessageIcon.Information, 3000)
+                    self.dashboard.show_message(f"✓ {vmid} is now {want}", "success", 3000)
                 else:
                     full = await client.get_guest_status(node, vmid, is_lxc=is_lxc)
-                    self.tray.tray.showMessage("ProxmoxWidget", f"{vmid} status: {full} (want {want})", QSystemTrayIcon.MessageIcon.Warning, 4000)
+                    self.dashboard.show_message(f"{vmid} status: {full} (want {want})", "warning", 4000)
             except Exception as e:
                 logger.error("action failed: {}", e)
-                self.tray.tray.showMessage("ProxmoxWidget — failed", str(e)[:220], QSystemTrayIcon.MessageIcon.Critical, 5000)
+                self.dashboard.show_message(f"✕ {action} failed: {str(e)[:180]}", "error", 5000)
             finally:
                 self.dashboard.set_busy(cluster_id, vmid, is_lxc, None)
                 for _ in range(3):

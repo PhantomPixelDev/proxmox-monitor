@@ -39,5 +39,3 @@ class Notifier(QObject):
     def _notify(self, title: str, msg: str) -> None:
         logger.info("notify: {} - {}", title, msg)
         self.notification_requested.emit(title, msg)
-        if self._tray:
-            self._tray.showMessage(title, msg, QSystemTrayIcon.MessageIcon.Warning, 4000)
