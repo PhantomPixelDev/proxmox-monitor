@@ -46,7 +46,10 @@ async def test_agent_ips_skips_loopback_and_ipv6(monkeypatch):
         assert path == "/nodes/pve/qemu/112/agent/network-get-interfaces"
         return {
             "result": [
-                {"name": "lo", "ip-addresses": [{"ip-address": "127.0.0.1", "ip-address-type": "ipv4"}]},
+                {
+                    "name": "lo",
+                    "ip-addresses": [{"ip-address": "127.0.0.1", "ip-address-type": "ipv4"}],
+                },
                 {
                     "name": "eth0",
                     "ip-addresses": [
@@ -74,3 +77,48 @@ def test_rdp_command_per_platform(monkeypatch):
         launcher.shutil, "which", lambda name: "/usr/bin/xfreerdp" if name == "xfreerdp" else None
     )
     assert launcher.rdp_command("10.0.0.5") == ["/usr/bin/xfreerdp", "/v:10.0.0.5:3389"]
+
+
+@pytest.mark.asyncio
+async def test_privileges_flattens_paths(monkeypatch):
+    client = _client()
+
+    async def fake_get(path):
+        assert path == "/access/permissions"
+        return {
+            "/": {"VM.Audit": 1, "VM.Console": 0},
+            "/vms/112": {"VM.Console": 1, "VM.PowerMgmt": 1},
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    assert await client.privileges() == {"VM.Audit", "VM.Console", "VM.PowerMgmt"}
+    assert await client.has_privilege("VM.Console")
+    assert not await client.has_privilege("Sys.Modify")
+
+
+@pytest.mark.asyncio
+async def test_spice_403_names_the_missing_privilege(monkeypatch):
+    from proxmox_widget.api.exceptions import ActionFailedError, AuthError
+
+    client = _client()
+
+    async def fake_post(path, data=None):
+        raise AuthError("[pve] auth failed: 403")
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    with pytest.raises(ActionFailedError, match=r"VM\.Console"):
+        await client.spice_config("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_agent_missing_reads_plainly(monkeypatch):
+    from proxmox_widget.api.exceptions import ActionFailedError
+
+    client = _client()
+
+    async def fake_get(path):
+        raise RuntimeError("Server error '500 No QEMU guest agent configured' for url https://x")
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    with pytest.raises(ActionFailedError, match="no QEMU guest agent enabled"):
+        await client.agent_ips("pve", 112)

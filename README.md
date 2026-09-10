@@ -36,10 +36,16 @@ Every release ships `SHA256SUMS.txt` if you want to verify the download.
 
 1. Install it, or unzip the portable build anywhere. It starts in the tray. On Windows check the hidden-icons chevron; on macOS look in the menu bar.
 2. In Proxmox, go to **Datacenter → Access → API Tokens → Add**. Pick a user such as `widget@pve`, set the token ID to `monitor`, and copy the secret — it is shown once.
-3. Under **Datacenter → Permissions → Add**, grant that user `PVEAuditor` on `/`. Add `VM.PowerMgmt` only if you want the start, stop and reboot buttons to work.
+3. Under **Datacenter → Permissions → Add**, grant that user `PVEAuditor` on `/`. Add `VM.PowerMgmt` for the start, stop and reboot buttons, and `VM.Console` for SPICE.
 4. In the tray, open Settings → Add, and enter the host, port `8006`, the token ID `widget@pve!monitor` and the secret.
 
 Self-signed certificates are fine: turn TLS verification off for that cluster. The secret goes to your OS keyring, never to a config file.
+
+### Consoles
+
+The Console button opens the Proxmox web console in your browser, and that page needs a web-UI login. An API token cannot create a browser session, so if you are not logged in, Proxmox answers `401 no ticket`. Log in to the web UI once, with Open Proxmox, and the console works for as long as that session lasts.
+
+SPICE and RDP do not need the browser. SPICE needs `VM.Console` on the token, and RDP needs the QEMU guest agent installed and running in the VM.
 
 ## What it does
 
@@ -57,6 +63,9 @@ Self-signed certificates are fine: turn TLS verification off for that cluster. T
 | `OFFLINE` right after adding a cluster | Check the banner error. Confirm `https://your-host:8006` loads in a browser, and re-paste the token without stray spaces. |
 | `401 Unauthorized` | Token ID or secret is wrong. The ID must be the full `user@realm!tokenname`. |
 | `403 Forbidden` on start or stop | The token lacks `VM.PowerMgmt`. Everything else keeps working without it. |
+| `401 no ticket` when opening a console | The browser has no Proxmox session. Log in to the web UI once, in the same browser. |
+| SPICE says the token lacks `VM.Console` | Add that privilege to the token in **Datacenter → Permissions**. |
+| RDP says there is no guest agent | Install and enable the QEMU guest agent in that VM; without it the app cannot learn its IP. |
 | Certificate error | Add your CA to the OS trust store, or turn TLS verification off for that cluster. |
 | No tray icon on Windows | Look under the hidden-icons chevron and drag it out. |
 | High CPU | Raise the refresh interval in Settings. |

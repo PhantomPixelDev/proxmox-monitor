@@ -27,6 +27,7 @@ class ProxmoxClient:
         self._client: httpx.AsyncClient | None = None
         self._ticket: str | None = None
         self._csrf: str | None = None
+        self._privs: set[str] | None = None
 
     def _token_headers(self) -> dict[str, str]:
         if self.cluster.auth_mode == AuthMode.TOKEN and self.cluster.token_id and self._secret:
@@ -301,9 +302,36 @@ class ProxmoxClient:
             f"{self.cluster.base_url}/?{urlencode({'console': 'shell', 'novnc': 1, 'node': node})}"
         )
 
+    async def privileges(self) -> set[str]:
+        """Every privilege this token holds, flattened across all paths."""
+        if self._privs is not None:
+            return self._privs
+        out: set[str] = set()
+        try:
+            data = await self._get("/access/permissions")
+        except Exception as e:
+            logger.warning("permission lookup failed: {}", e)
+            return out
+        if isinstance(data, dict):
+            for privs in data.values():
+                if isinstance(privs, dict):
+                    out.update(k for k, v in privs.items() if v)
+        self._privs = out
+        return out
+
+    async def has_privilege(self, name: str) -> bool:
+        return name in await self.privileges()
+
     async def spice_config(self, node: str, vmid: int) -> dict[str, Any]:
         """POST spiceproxy — returns the key/values that make up a .vv file."""
-        data = await self._post(f"/nodes/{node}/qemu/{vmid}/spiceproxy")
+        try:
+            data = await self._post(f"/nodes/{node}/qemu/{vmid}/spiceproxy")
+        except AuthError as e:
+            if "403" in str(e):
+                raise ActionFailedError(
+                    "Token lacks VM.Console — add it in Datacenter, Permissions"
+                ) from e
+            raise
         if not isinstance(data, dict):
             raise ActionFailedError(f"spiceproxy returned no config for {vmid}")
         return data
@@ -325,7 +353,16 @@ class ProxmoxClient:
         try:
             data = await self._get(f"/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces")
         except Exception as e:
-            raise ActionFailedError(f"guest agent unavailable on {vmid}: {e}") from e
+            msg = str(e)
+            if "No QEMU guest agent configured" in msg:
+                raise ActionFailedError("This VM has no QEMU guest agent enabled") from e
+            if "not running" in msg:
+                raise ActionFailedError("The guest agent is not responding") from e
+            if "403" in msg:
+                raise ActionFailedError(
+                    "Token lacks VM.GuestAgent.Audit — add it in Datacenter, Permissions"
+                ) from e
+            raise ActionFailedError(f"Guest agent unavailable: {msg[:120]}") from e
         ifaces = data.get("result", data) if isinstance(data, dict) else data
         out: list[str] = []
         for iface in ifaces or []:

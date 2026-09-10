@@ -123,10 +123,14 @@ footer p{margin:0 0 .35rem}
 <h2>Setup</h2>
 <ol>
   <li>Install it, or unzip the portable build anywhere. It starts in the tray.</li>
-  <li>In Proxmox, create an API token. <code>PVEAuditor</code> covers monitoring; add <code>VM.PowerMgmt</code> if you want the power buttons.</li>
+  <li>In Proxmox, create an API token. <code>PVEAuditor</code> covers monitoring; add <code>VM.PowerMgmt</code> for the power buttons and <code>VM.Console</code> for SPICE.</li>
   <li>Open Settings in the tray menu, add the host, port <code>8006</code>, and the token ID and secret.</li>
 </ol>
 <p class="fine">Self-signed certificates are fine — leave TLS verification off for them. Full token instructions are in the <a href="https://github.com/PhantomPixelDev/proxmox-monitor/blob/master/README.md">README</a>.</p>
+
+<h2>Consoles</h2>
+<p>The Console button opens the Proxmox web console in your browser, and that page needs a web-UI login. API tokens cannot create a browser session, so log in to the web UI once and the console works for as long as that session lasts.</p>
+<p>SPICE and RDP skip the browser. SPICE needs <code>VM.Console</code> on the token; RDP needs the QEMU guest agent running in the VM.</p>
 
 <footer>
   <p>MIT licensed. Built and published by GitHub Actions.</p>

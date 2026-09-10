@@ -40,6 +40,7 @@ class ProxmoxWidgetApp:
         self.notifier = Notifier(self.tray_icon)
 
         self._health: list[ClusterHealth] = []
+        self._browser_note_shown = False
         self._timer = QTimer()
         self._timer.timeout.connect(self._on_timer)
         self._apply_theme()
@@ -176,35 +177,53 @@ class ProxmoxWidgetApp:
                     return g.name
         return str(vmid)
 
+    # The browser console is a web-UI page authenticated by a PVEAuthCookie
+    # session. An API token cannot create one, so Proxmox answers "401 no ticket"
+    # unless the user is already logged in to the web UI in that browser. Said
+    # once per run rather than on every click.
+    _BROWSER_LOGIN_NOTE = (
+        "Opened in your browser. If Proxmox says 401 no ticket, log in there once — "
+        "API tokens cannot create a browser session."
+    )
+
     def _on_console(self, cluster_id: str, node: str, vmid: int, kind: str, is_lxc: bool) -> None:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
         if not cluster:
             return
         client = ProxmoxClient(cluster)
 
-        if kind == "shell":
-            launcher.open_url(client.node_shell_url(node))
-            self.dashboard.show_message(f"Opening shell on {node}…", "info", 2500)
-            return
-
-        if kind == "novnc":
-            name = self._guest_name(cluster_id, vmid, is_lxc)
-            launcher.open_url(client.console_url(node, vmid, name, is_lxc=is_lxc))
-            self.dashboard.show_message(f"Opening console for {name}…", "info", 2500)
+        if kind in ("shell", "novnc"):
+            if kind == "shell":
+                launcher.open_url(client.node_shell_url(node))
+            else:
+                name = self._guest_name(cluster_id, vmid, is_lxc)
+                launcher.open_url(client.console_url(node, vmid, name, is_lxc=is_lxc))
+            if self._browser_note_shown:
+                self.dashboard.show_message("Console opened in your browser", "info", 2500)
+            else:
+                self._browser_note_shown = True
+                self.dashboard.show_message(self._BROWSER_LOGIN_NOTE, "warning", 9000)
             return
 
         if kind == "spice":
-            self.dashboard.show_message(f"Requesting SPICE ticket for {vmid}…", "info", 2500)
+            self.dashboard.show_message("Requesting a SPICE ticket…", "info", 2500)
 
             async def _spice() -> None:
                 try:
+                    if not await client.has_privilege("VM.Console"):
+                        self.dashboard.show_message(
+                            "Token lacks VM.Console — add it in Datacenter, Permissions",
+                            "error",
+                            7000,
+                        )
+                        return
                     cfg = await client.spice_config(node, vmid)
                     path = launcher.open_spice(ProxmoxClient.spice_vv(cfg), vmid)
                     logger.info("spice file {}", path)
                     self.dashboard.show_message("SPICE handed to remote-viewer", "success", 3000)
                 except Exception as e:
                     logger.error("spice failed: {}", e)
-                    self.dashboard.show_message(f"SPICE failed: {str(e)[:160]}", "error", 5000)
+                    self.dashboard.show_message(f"SPICE: {str(e)[:150]}", "error", 7000)
 
             self._run_async(_spice)
             return
@@ -217,20 +236,18 @@ class ProxmoxWidgetApp:
                     ips = await client.agent_ips(node, vmid)
                 except Exception as e:
                     logger.error("agent lookup failed: {}", e)
-                    self.dashboard.show_message(
-                        f"No guest agent on {vmid} — cannot resolve an IP", "error", 5000
-                    )
+                    self.dashboard.show_message(f"RDP: {str(e)[:150]}", "error", 7000)
                     return
                 if not ips:
                     self.dashboard.show_message(
-                        f"Guest agent on {vmid} reported no IPv4 address", "warning", 5000
+                        "The guest agent reported no IPv4 address", "warning", 5000
                     )
                     return
                 if launcher.open_rdp(ips[0]):
-                    self.dashboard.show_message(f"RDP → {ips[0]}", "success", 3000)
+                    self.dashboard.show_message(f"RDP to {ips[0]}", "success", 3000)
                 else:
                     self.dashboard.show_message(
-                        "No RDP client installed (mstsc, xfreerdp, remmina)", "error", 5000
+                        "No RDP client found (mstsc, xfreerdp, remmina)", "error", 6000
                     )
 
             self._run_async(_rdp)
