@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from proxmox_widget.api.client import ProxmoxClient
@@ -186,7 +188,11 @@ async def test_spice_without_a_spice_display_says_so(monkeypatch):
     async def fake_post(path, data=None):
         raise RuntimeError("Server error '500 no spice port' for url https://x")
 
+    async def running(node, vmid, is_lxc=False):
+        return "running"
+
     monkeypatch.setattr(client, "_post", fake_post)
+    monkeypatch.setattr(client, "get_guest_status", running)
     with pytest.raises(ActionFailedError, match="no SPICE display"):
         await client.spice_config("pve", 112)
 
@@ -200,6 +206,74 @@ async def test_agent_installed_but_silent_says_so(monkeypatch):
     async def fake_get(path):
         raise RuntimeError("Server error '500 QEMU guest agent is not running' for url https://x")
 
+    async def running(node, vmid, is_lxc=False):
+        return "running"
+
     monkeypatch.setattr(client, "_get", fake_get)
+    monkeypatch.setattr(client, "get_guest_status", running)
     with pytest.raises(ActionFailedError, match="not answering"):
         await client.agent_ips("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_stopped_vm_is_not_blamed_on_its_display(monkeypatch):
+    """PVE answers 'no spice port' for a stopped guest too, which read as a
+    misconfigured display even when the display was right."""
+    from proxmox_widget.api.exceptions import ActionFailedError
+
+    client = _client()
+
+    async def fake_post(path, data=None):
+        raise RuntimeError("Server error '500 no spice port' for url https://x")
+
+    async def fake_status(node, vmid, is_lxc=False):
+        return "stopped"
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    monkeypatch.setattr(client, "get_guest_status", fake_status)
+    with pytest.raises(ActionFailedError, match="is not running"):
+        await client.spice_config("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_running_vm_without_a_spice_display_still_says_display(monkeypatch):
+    from proxmox_widget.api.exceptions import ActionFailedError
+
+    client = _client()
+
+    async def fake_post(path, data=None):
+        raise RuntimeError("Server error '500 no spice port' for url https://x")
+
+    async def fake_status(node, vmid, is_lxc=False):
+        return "running"
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    monkeypatch.setattr(client, "get_guest_status", fake_status)
+    with pytest.raises(ActionFailedError, match="no SPICE display"):
+        await client.spice_config("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_spice_proxy_falls_back_to_the_configured_host(monkeypatch):
+    """PVE hands back its own hostname, which often does not resolve for the user."""
+    client = _client()
+
+    async def fake_post(path, data=None):
+        return {
+            "proxy": "http://pve.homelab:3128",
+            "host-subject": "CN=pve.homelab",
+            "tls-port": 61000,
+        }
+
+    monkeypatch.setattr(client, "_post", fake_post)
+
+    loop = asyncio.get_running_loop()
+
+    async def fail_resolve(host, port):
+        raise OSError("name does not resolve")
+
+    monkeypatch.setattr(loop, "getaddrinfo", fail_resolve, raising=False)
+
+    cfg = await client.spice_config("pve", 112)
+    assert cfg["proxy"] == "http://1.2.3.4:3128"
+    assert cfg["host-subject"] == "CN=pve.homelab", "TLS pinning must be left alone"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from loguru import logger
@@ -360,8 +361,10 @@ class ProxmoxClient:
             raise
         except Exception as e:
             msg = str(e)
-            # PVE only opens a SPICE port when the guest has a SPICE display
+            # a stopped guest has no spice port either, so ask before blaming the display
             if "no spice port" in msg or ("spice" in msg.lower() and "500" in msg):
+                if await self.get_guest_status(node, vmid) != "running":
+                    raise ActionFailedError(f"VM {vmid} is not running") from e
                 raise ActionFailedError(
                     f"VM {vmid} has no SPICE display — set Display to SPICE (qxl) "
                     "in its Hardware tab, then reboot it"
@@ -369,7 +372,32 @@ class ProxmoxClient:
             raise ActionFailedError(f"SPICE unavailable: {msg[:120]}") from e
         if not isinstance(data, dict):
             raise ActionFailedError(f"spiceproxy returned no config for {vmid}")
-        return data
+        return await self._reachable_spice_proxy(data)
+
+    async def _reachable_spice_proxy(self, cfg: dict[str, Any]) -> dict[str, Any]:
+        """Point the ticket at an address this machine can actually resolve.
+
+        PVE fills in the node's own hostname, which often only resolves inside
+        the server's network. TLS is pinned through host-subject rather than the
+        address, so swapping in the host the user configured is safe.
+        """
+        proxy = str(cfg.get("proxy") or "")
+        if not proxy:
+            return cfg
+        parsed = urlsplit(proxy)
+        hostname = parsed.hostname
+        if not hostname or hostname == self.cluster.host:
+            return cfg
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.getaddrinfo(hostname, parsed.port or 3128)
+            return cfg
+        except OSError:
+            pass
+        port = f":{parsed.port}" if parsed.port else ""
+        cfg["proxy"] = f"{parsed.scheme or 'http'}://{self.cluster.host}{port}"
+        logger.info("spice proxy {} does not resolve, using {}", hostname, cfg["proxy"])
+        return cfg
 
     @staticmethod
     def spice_vv(config: dict[str, Any]) -> str:
@@ -395,6 +423,8 @@ class ProxmoxClient:
                     "in its Options tab, then reboot it"
                 ) from e
             if "not running" in msg:
+                if await self.get_guest_status(node, vmid) != "running":
+                    raise ActionFailedError(f"VM {vmid} is not running") from e
                 raise ActionFailedError(
                     f"Guest agent not answering on VM {vmid} — start the QEMU Guest Agent "
                     "service inside the guest, and reboot the VM if you only just enabled it"

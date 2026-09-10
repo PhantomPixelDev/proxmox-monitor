@@ -48,7 +48,7 @@ The Console button opens the Proxmox web console in your browser, and that page 
 SPICE and RDP do not need the browser, but the VM has to be set up for them:
 
 - **SPICE** needs `VM.Console` on the token, and the VM's Display set to SPICE (qxl) in its Hardware tab. The default display has no SPICE port.
-- **RDP** needs QEMU Guest Agent ticked in the VM's Options tab *and* the agent service running inside the guest, so the app can ask it for an address. Enabling the option only takes effect after the VM is rebooted.
+- **RDP** needs QEMU Guest Agent ticked in the VM's Options tab *and* the agent service running inside the guest, so the app can ask it for an address. On Windows that means installing virtio-win guest tools; ticking the option alone does nothing. Enabling it only takes effect after the VM is stopped and started, not rebooted from inside.
 
 ## What it does
 
