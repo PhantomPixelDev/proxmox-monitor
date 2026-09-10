@@ -65,15 +65,12 @@ figcaption{margin-top:.6rem;font-size:.85rem;color:var(--muted);text-align:cente
 .dl .kind{margin-left:auto;color:var(--muted);font-size:.85rem;white-space:nowrap}
 .fine{font-size:.9rem;color:var(--muted)}
 
-.shots{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:1rem}
-.shots figure img{border-radius:6px}
 
 footer{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
 footer p{margin:0 0 .35rem}
 
 @media(max-width:560px){
   body{font-size:16px}
-  .shots{grid-template-columns:1fr}
   .dl .file{display:none}
 }
 </style>
@@ -122,26 +119,6 @@ footer p{margin:0 0 .35rem}
   <li>Authenticates with an API token kept in your OS keyring. A read-only token is enough to monitor.</li>
   <li>Handles several clusters at once and flags any that go offline.</li>
 </ul>
-
-<h2>Screenshots</h2>
-<div class="shots">
-  <figure>
-    <img src="screenshots/vms.png" width="468" height="880" alt="VMs tab: each guest is a card with status, usage bars, and power and console buttons" loading="lazy" decoding="async">
-    <figcaption>VMs — power and console per guest</figcaption>
-  </figure>
-  <figure>
-    <img src="screenshots/search.png" width="468" height="620" alt="VMs tab filtered by the search term win, showing one matching guest" loading="lazy" decoding="async">
-    <figcaption>Search on every tab</figcaption>
-  </figure>
-  <figure>
-    <img src="screenshots/storage.png" width="468" height="626" alt="Storage tab showing local, local-lvm and an NFS share with usage bars" loading="lazy" decoding="async">
-    <figcaption>Storage</figcaption>
-  </figure>
-  <figure>
-    <img src="screenshots/settings.png" width="540" height="836" alt="Settings dialog with the cluster list, connection form and preferences" loading="lazy" decoding="async">
-    <figcaption>Settings</figcaption>
-  </figure>
-</div>
 
 <h2>Setup</h2>
 <ol>

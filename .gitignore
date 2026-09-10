@@ -24,3 +24,8 @@ config.json
 resources/app.ico
 resources/app.png
 resources/app.svg
+
+# only the one screenshot the site uses is tracked;
+# scripts/capture_screenshots.py regenerates the rest on demand
+docs/screenshots/*.png
+!docs/screenshots/dashboard.png
