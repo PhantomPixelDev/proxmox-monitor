@@ -24,3 +24,10 @@ def test_password_mode():
 def test_settings_defaults():
     s = AppSettings()
     assert s.refresh_interval_seconds == 30
+
+
+def test_tls_verification_is_on_by_default():
+    """A token must not cross an unverified connection unless asked."""
+    from proxmox_widget.config.models import ClusterConfig
+
+    assert ClusterConfig(id="a", name="a", host="h").verify_ssl is True

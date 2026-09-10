@@ -122,3 +122,56 @@ async def test_agent_missing_reads_plainly(monkeypatch):
     monkeypatch.setattr(client, "_get", fake_get)
     with pytest.raises(ActionFailedError, match="no QEMU guest agent enabled"):
         await client.agent_ips("pve", 112)
+
+
+def test_rdp_prefers_the_address_on_the_proxmox_network():
+    ips = ["172.17.0.1", "10.8.0.4", "192.168.10.55"]
+    assert launcher.pick_rdp_host(ips, near="192.168.10.2") == "192.168.10.55"
+
+
+def test_rdp_falls_back_when_nothing_is_on_that_network():
+    assert launcher.pick_rdp_host(["10.8.0.4"], near="192.168.10.2") == "10.8.0.4"
+    assert launcher.pick_rdp_host([], near="192.168.10.2") is None
+    assert launcher.pick_rdp_host(["127.0.0.1", "169.254.1.1"]) is None
+
+
+def test_spice_file_is_private_and_removable():
+    import os
+    import stat
+
+    path = launcher.write_spice_file("[virt-viewer]\npassword=TICKET\n", 42)
+    try:
+        assert path.read_text(encoding="utf-8").endswith("TICKET\n")
+        if os.name != "nt":
+            # the ticket is live; no other local user may read it
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+            assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    finally:
+        launcher.discard(path)
+    assert not path.exists()
+
+
+@pytest.mark.asyncio
+async def test_agent_ips_skips_container_bridges(monkeypatch):
+    client = _client()
+
+    async def fake_get(path):
+        return {
+            "result": [
+                {
+                    "name": "docker0",
+                    "ip-addresses": [{"ip-address": "172.17.0.1", "ip-address-type": "ipv4"}],
+                },
+                {
+                    "name": "veth0",
+                    "ip-addresses": [{"ip-address": "172.18.0.1", "ip-address-type": "ipv4"}],
+                },
+                {
+                    "name": "ens18",
+                    "ip-addresses": [{"ip-address": "192.168.10.55", "ip-address-type": "ipv4"}],
+                },
+            ]
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    assert await client.agent_ips("pve", 112) == ["192.168.10.55"]

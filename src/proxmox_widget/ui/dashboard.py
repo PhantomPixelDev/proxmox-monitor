@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QScrollBar,
     QSizePolicy,
     QTabWidget,
     QVBoxLayout,
@@ -58,6 +59,8 @@ class Dashboard(QWidget):
         self._search: dict[str, QLineEdit] = {}
         self._counts: dict[str, QLabel] = {}
         self._running_only: dict[str, QPushButton] = {}
+        self._scrolls: dict[str, QScrollArea] = {}
+        self._scroll_handlers: dict[str, object] = {}
         self._build()
 
     # ------------------------------------------------------------------ chrome
@@ -186,6 +189,7 @@ class Dashboard(QWidget):
         sa.setFrameShape(QFrame.Shape.NoFrame)
         sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         sa.setWidget(content)
+        self._scrolls[key] = sa
         lay.addWidget(sa, 1)
         return page
 
@@ -344,6 +348,8 @@ class Dashboard(QWidget):
         return any(query in str(f).lower() for f in fields)
 
     def _rebuild(self, key: str) -> None:
+        bar = self._scrolls[key].verticalScrollBar()
+        offset = bar.value()
         lay = self._clear(key)
         if not self._health:
             for c in self._counts.values():
@@ -363,6 +369,36 @@ class Dashboard(QWidget):
         if shown == 0:
             q = self._query(key)
             self._empty(lay, f'Nothing matches "{q}".' if q else "Nothing here yet.")
+        if offset:
+            self._restore_scroll(key, bar, offset)
+
+    def _restore_scroll(self, key: str, bar: QScrollBar, offset: int) -> None:
+        """Put a rebuilt list back where the user had scrolled it.
+
+        The fresh cards have no size yet, so the scrollbar range is still 0 when
+        this runs. Waiting for the range to be recalculated is the only reliable
+        moment to set the value.
+        """
+        bar.setValue(min(offset, bar.maximum()))
+        self._drop_scroll_handler(key, bar)
+
+        def restore(_minimum: int, maximum: int) -> None:
+            if maximum <= 0:
+                return
+            bar.setValue(min(offset, maximum))
+            self._drop_scroll_handler(key, bar)
+
+        self._scroll_handlers[key] = restore
+        bar.rangeChanged.connect(restore)
+
+    def _drop_scroll_handler(self, key: str, bar: QScrollBar) -> None:
+        handler = self._scroll_handlers.pop(key, None)
+        if handler is None:
+            return
+        try:
+            bar.rangeChanged.disconnect(handler)
+        except (RuntimeError, TypeError):
+            pass
 
     def _empty(self, lay: QVBoxLayout, text: str) -> None:
         lbl = QLabel(text)

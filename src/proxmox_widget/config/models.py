@@ -29,7 +29,7 @@ class ClusterConfig(BaseModel):
     name: str = Field(description="Display name")
     host: str = Field(description="Hostname or IP, e.g. '192.168.1.10'")
     port: int = Field(default=8006, ge=1, le=65535)
-    verify_ssl: bool = Field(default=False, description="Verify TLS; false for self-signed")
+    verify_ssl: bool = Field(default=True, description="Verify TLS; turn off for self-signed")
     auth_mode: AuthMode = Field(default=AuthMode.TOKEN)
     token_id: str = Field(default="", description="Full token id e.g. 'root@pam!widget'")
     username: str = Field(

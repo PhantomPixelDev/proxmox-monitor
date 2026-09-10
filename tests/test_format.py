@@ -3,7 +3,8 @@ from proxmox_widget.utils.format import fmt_bytes, fmt_uptime
 
 def test_fmt_bytes():
     assert fmt_bytes(0) == "0 B"
-    assert "KB" in fmt_bytes(2048)
+    assert fmt_bytes(2048) == "2.0 KiB"
+    assert fmt_bytes(1024**3) == "1.0 GiB"
 
 
 def test_fmt_uptime():

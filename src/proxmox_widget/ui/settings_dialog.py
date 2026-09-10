@@ -42,6 +42,8 @@ def _parse_host_port(raw: str) -> tuple[str, int]:
 
 class SettingsDialog(QDialog):
     settings_saved = Signal(AppSettings)
+    # cluster, secret — the app runs the probe, this dialog only shows it
+    test_requested = Signal(ClusterConfig, str)
 
     def __init__(self, settings: AppSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -109,6 +111,10 @@ class SettingsDialog(QDialog):
         self.btn_save_cluster.setObjectName("primary")
         self.btn_save_cluster.clicked.connect(self._save_current_cluster)
         row_save.addWidget(self.btn_save_cluster)
+        self.btn_test = QPushButton("Test")
+        self.btn_test.setToolTip("Check the host, the secret and what the token may do")
+        self.btn_test.clicked.connect(self._test_current_cluster)
+        row_save.addWidget(self.btn_test)
         self.lbl_cluster_hint = QLabel("")
         self.lbl_cluster_hint.setObjectName("muted")
         self.lbl_cluster_hint.setWordWrap(True)
@@ -188,7 +194,7 @@ class SettingsDialog(QDialog):
         self.ed_token_id.setText("root@pam!widget")
         self.ed_user.setText("root@pam")
         self.ed_secret.setText("")
-        self.chk_verify.setChecked(False)
+        self.chk_verify.setChecked(True)
         self.list.clearSelection()
         self.ed_id.setFocus()
 
@@ -200,6 +206,52 @@ class SettingsDialog(QDialog):
         self._settings = remove_cluster(self._settings, cid)
         self._refresh_list()
         self.lbl_cluster_hint.setText(f"Removed {cid}")
+
+    def _form_cluster(self) -> tuple[ClusterConfig, str] | None:
+        """Read the form into a config. None if a required field is empty."""
+        cid = self.ed_id.text().strip()
+        host_raw = self.ed_host.text().strip()
+        secret = self.ed_secret.text().strip()
+        if not cid or not host_raw or not secret:
+            return None
+        host, port_from_host = _parse_host_port(host_raw)
+        port = self.spin_port.value()
+        if ":" in host_raw and port == 8006 and port_from_host != 8006:
+            port = port_from_host
+        is_token = self.combo_auth.currentIndex() == 0
+        token_id = self.ed_token_id.text().strip()
+        if is_token and not token_id:
+            return None
+        return (
+            ClusterConfig(
+                id=cid,
+                name=self.ed_name.text().strip() or cid,
+                host=host,
+                port=port,
+                verify_ssl=self.chk_verify.isChecked(),
+                auth_mode=AuthMode.TOKEN if is_token else AuthMode.PASSWORD,
+                token_id=token_id if is_token else "",
+                username=self.ed_user.text().strip() or "root@pam" if not is_token else "root@pam",
+            ),
+            secret,
+        )
+
+    def _test_current_cluster(self) -> None:
+        form = self._form_cluster()
+        if form is None:
+            QMessageBox.warning(
+                self, "Incomplete", "Fill in ID, host, secret and token ID before testing"
+            )
+            return
+        self.btn_test.setEnabled(False)
+        self.lbl_cluster_hint.setStyleSheet("")
+        self.lbl_cluster_hint.setText("Testing…")
+        self.test_requested.emit(*form)
+
+    def show_test_result(self, text: str, ok: bool) -> None:
+        self.btn_test.setEnabled(True)
+        self.lbl_cluster_hint.setStyleSheet("" if ok else "color: #f87171;")
+        self.lbl_cluster_hint.setText(text)
 
     def _save_current_cluster(self) -> None:
         cid = self.ed_id.text().strip()

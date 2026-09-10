@@ -4,28 +4,36 @@ import asyncio
 import sys
 
 from loguru import logger
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from proxmox_widget.api.client import ProxmoxClient
 from proxmox_widget.config.manager import load_settings
-from proxmox_widget.config.models import ClusterHealth
+from proxmox_widget.config.models import ClusterConfig, ClusterHealth
 from proxmox_widget.core import launcher
 from proxmox_widget.core.notifier import Notifier
+from proxmox_widget.core.runner import AsyncRunner
 from proxmox_widget.resources.icons import make_app_icon, make_tray_icon
 from proxmox_widget.ui.dashboard import Dashboard
 from proxmox_widget.ui.settings_dialog import SettingsDialog
 from proxmox_widget.ui.themes import qss_for
 from proxmox_widget.ui.tray import TrayManager
 
+# how long remote-viewer gets to read the SPICE ticket before it is deleted
+SPICE_FILE_TTL_MS = 30_000
+
 
 def _pick_icon() -> QIcon:
     return make_app_icon(256)
 
 
-class ProxmoxWidgetApp:
+class ProxmoxWidgetApp(QObject):
+    # emitted from the worker thread; Qt queues them onto the GUI thread
+    message = Signal(str, str, int)
+
     def __init__(self, app: QApplication) -> None:
+        super().__init__()
         self.app = app
         self.settings = load_settings()
         self.app.setQuitOnLastWindowClosed(False)
@@ -41,13 +49,19 @@ class ProxmoxWidgetApp:
 
         self._health: list[ClusterHealth] = []
         self._browser_note_shown = False
-        self._timer = QTimer()
-        self._timer.timeout.connect(self._on_timer)
+        self._refreshing = False
+        self._runner = AsyncRunner()
+        self.app.aboutToQuit.connect(self._runner.stop)
+
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self.refresh_now)
         self._apply_theme()
         self._wire()
 
         if not self.settings.start_minimized:
             QTimer.singleShot(400, self.show_dashboard)
+
+    # ----------------------------------------------------------------- wiring
 
     def _wire(self) -> None:
         self.tray.show_dashboard.connect(self.show_dashboard)
@@ -60,8 +74,13 @@ class ProxmoxWidgetApp:
         self.dashboard.console_requested.connect(self._on_console)
         self.dashboard.refresh_requested.connect(self.refresh_now)
         self.notifier.notification_requested.connect(self._on_notify)
+        self.message.connect(self.dashboard.show_message)
         self.tray.set_clusters(self.settings.clusters)
         self.dashboard.set_clusters(self.settings.clusters)
+
+    def _spawn(self, factory, on_done=None, on_error=None) -> None:  # type: ignore[no-untyped-def]
+        """Run a coroutine on the worker loop, with GUI-thread callbacks."""
+        self._runner.submit(factory, on_done, on_error)
 
     def _on_notify(self, title: str, msg: str) -> None:
         kind = "warning" if "offline" in title.lower() or "stopped" in title.lower() else "info"
@@ -78,12 +97,12 @@ class ProxmoxWidgetApp:
         self._timer.start(interval * 1000)
         self.refresh_now()
 
+    # ------------------------------------------------------------------ views
+
     def show_dashboard(self) -> None:
-        # position near tray: bottom-right
         self.dashboard.show()
         self.dashboard.raise_()
         self.dashboard.activateWindow()
-        # try to place near cursor/tray
         try:
             from PySide6.QtGui import QCursor
 
@@ -106,6 +125,7 @@ class ProxmoxWidgetApp:
     def show_settings(self) -> None:
         dlg = SettingsDialog(self.settings, None)
         dlg.settings_saved.connect(self._on_settings_saved)
+        dlg.test_requested.connect(self._on_test_cluster)
         dlg.exec()
 
     def _on_settings_saved(self, new_settings) -> None:  # type: ignore[no-untyped-def]
@@ -116,57 +136,98 @@ class ProxmoxWidgetApp:
         self._timer.start(max(5, self.settings.refresh_interval_seconds) * 1000)
         self.refresh_now()
 
-    def _open_proxmox(self) -> None:
-        import webbrowser as wb
+    def _on_test_cluster(self, cluster: ClusterConfig, secret: str) -> None:
+        """Settings asked to check one endpoint before saving it."""
 
+        async def _test() -> str:
+            client = ProxmoxClient(cluster, secret=secret or None)
+            async with client:
+                version = await client.version()
+                privs = await client.privileges()
+            line = f"Connected to Proxmox VE {version}."
+            if not privs:
+                return f"{line} Could not read the token's privileges."
+            missing = [p for p in ("VM.PowerMgmt", "VM.Console") if p not in privs]
+            if not missing:
+                return f"{line} The token can monitor, power guests and open SPICE."
+            lacks = " and ".join(
+                "power guests" if m == "VM.PowerMgmt" else "open SPICE" for m in missing
+            )
+            return (
+                f"{line} Monitoring works, but the token cannot {lacks}: add {', '.join(missing)}."
+            )
+
+        self._spawn(
+            _test,
+            on_done=lambda text: self._show_test_result(str(text), True),
+            on_error=lambda err: self._show_test_result(str(err)[:200], False),
+        )
+
+    def _show_test_result(self, text: str, ok: bool) -> None:
+        for widget in self.app.topLevelWidgets():
+            if isinstance(widget, SettingsDialog):
+                widget.show_test_result(text, ok)
+
+    def _open_proxmox(self) -> None:
         if not self.settings.clusters:
             return
         for h in self._health:
             if h.online:
                 c = next((x for x in self.settings.clusters if x.id == h.cluster_id), None)
                 if c:
-                    wb.open(c.base_url)
+                    launcher.open_url(c.base_url)
                     return
-        wb.open(self.settings.clusters[0].base_url)
+        launcher.open_url(self.settings.clusters[0].base_url)
 
-    def _on_timer(self) -> None:
-        self.refresh_now()
+    # ---------------------------------------------------------------- refresh
 
     def refresh_now(self) -> None:
-        # run async fetch without blocking UI — use asyncio.to_thread style via singleShot
-        # we launch an asyncio run in a QTimer 0
-        QTimer.singleShot(0, self._kick_async)
-
-    def _kick_async(self) -> None:
-        try:
-            asyncio.run(self._fetch_all())
-        except RuntimeError:
-            # if already in event loop (pytest), create new loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._fetch_all())
-
-    async def _fetch_all(self) -> None:
-        if not self.settings.clusters:
-            self.dashboard.update_health([])
-            self.tray.update_from_health([])
+        if self._refreshing:
+            logger.debug("refresh already in flight, skipping")
             return
-        results: list[ClusterHealth] = []
-        for c in self.settings.clusters:
-            client = ProxmoxClient(c)
+        self._refreshing = True
+        self._spawn(self._fetch_all, self._on_health, self._on_fetch_failed)
+
+    async def _fetch_all(self) -> list[ClusterHealth]:
+        """Query every cluster at once. No Qt object is touched here."""
+        clusters = list(self.settings.clusters)
+        if not clusters:
+            return []
+
+        async def one(c: ClusterConfig) -> ClusterHealth:
             try:
-                h = await client.fetch_health()
+                async with ProxmoxClient(c) as client:
+                    return await client.fetch_health()
             except Exception as e:
-                h = ClusterHealth(cluster_id=c.id, cluster_name=c.name, online=False, error=str(e))
-            results.append(h)
-        self._health = results
-        self.dashboard.update_health(results)
-        self.tray.update_from_health(results)
-        # update tray icon color/badging based on health
-        online = sum(1 for h in results if h.online)
-        alerts = sum(1 for h in results if not h.online)
+                logger.warning("cluster {} failed: {}", c.id, e)
+                return ClusterHealth(
+                    cluster_id=c.id, cluster_name=c.name, online=False, error=str(e)
+                )
+
+        return list(await asyncio.gather(*(one(c) for c in clusters)))
+
+    def _on_health(self, results: object) -> None:
+        self._refreshing = False
+        health = list(results) if isinstance(results, list) else []
+        self._health = health
+        self.dashboard.update_health(health)
+        self.tray.update_from_health(health)
+        online = sum(1 for h in health if h.online)
+        alerts = sum(1 for h in health if not h.online)
         self.tray_icon.setIcon(make_tray_icon(64, online=(online > 0), alerts=alerts))
-        self.notifier.check(results)
+        self.notifier.check(health)
+
+    def _on_fetch_failed(self, error: object) -> None:
+        self._refreshing = False
+        logger.error("refresh failed: {}", error)
+        self.dashboard.show_message(f"Refresh failed: {str(error)[:150]}", "error", 5000)
+
+    # --------------------------------------------------------------- consoles
+
+    _BROWSER_LOGIN_NOTE = (
+        "Opened in your browser. If Proxmox says 401 no ticket, log in there once — "
+        "API tokens cannot create a browser session."
+    )
 
     def _guest_name(self, cluster_id: str, vmid: int, is_lxc: bool) -> str:
         for h in self._health:
@@ -177,22 +238,13 @@ class ProxmoxWidgetApp:
                     return g.name
         return str(vmid)
 
-    # The browser console is a web-UI page authenticated by a PVEAuthCookie
-    # session. An API token cannot create one, so Proxmox answers "401 no ticket"
-    # unless the user is already logged in to the web UI in that browser. Said
-    # once per run rather than on every click.
-    _BROWSER_LOGIN_NOTE = (
-        "Opened in your browser. If Proxmox says 401 no ticket, log in there once — "
-        "API tokens cannot create a browser session."
-    )
-
     def _on_console(self, cluster_id: str, node: str, vmid: int, kind: str, is_lxc: bool) -> None:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
         if not cluster:
             return
-        client = ProxmoxClient(cluster)
 
         if kind in ("shell", "novnc"):
+            client = ProxmoxClient(cluster)
             if kind == "shell":
                 launcher.open_url(client.node_shell_url(node))
             else:
@@ -208,117 +260,83 @@ class ProxmoxWidgetApp:
         if kind == "spice":
             self.dashboard.show_message("Requesting a SPICE ticket…", "info", 2500)
 
-            async def _spice() -> None:
-                try:
-                    if not await client.has_privilege("VM.Console"):
-                        self.dashboard.show_message(
-                            "Token lacks VM.Console — add it in Datacenter, Permissions",
-                            "error",
-                            7000,
+            async def _spice() -> str:
+                async with ProxmoxClient(cluster) as c:
+                    if not await c.has_privilege("VM.Console"):
+                        raise PermissionError(
+                            "Token lacks VM.Console — add it in Datacenter, Permissions"
                         )
-                        return
-                    cfg = await client.spice_config(node, vmid)
-                    path = launcher.open_spice(ProxmoxClient.spice_vv(cfg), vmid)
-                    logger.info("spice file {}", path)
-                    self.dashboard.show_message("SPICE handed to remote-viewer", "success", 3000)
-                except Exception as e:
-                    logger.error("spice failed: {}", e)
-                    self.dashboard.show_message(f"SPICE: {str(e)[:150]}", "error", 7000)
+                    cfg = await c.spice_config(node, vmid)
+                return str(launcher.open_spice(ProxmoxClient.spice_vv(cfg), vmid))
 
-            self._run_async(_spice)
+            self._spawn(_spice, on_done=self._on_spice_ready, on_error=self._on_console_failed)
             return
 
         if kind == "rdp":
             self.dashboard.show_message("Asking the guest agent for an IP…", "info", 2500)
 
-            async def _rdp() -> None:
-                try:
-                    ips = await client.agent_ips(node, vmid)
-                except Exception as e:
-                    logger.error("agent lookup failed: {}", e)
-                    self.dashboard.show_message(f"RDP: {str(e)[:150]}", "error", 7000)
-                    return
-                if not ips:
-                    self.dashboard.show_message(
-                        "The guest agent reported no IPv4 address", "warning", 5000
-                    )
-                    return
-                if launcher.open_rdp(ips[0]):
-                    self.dashboard.show_message(f"RDP to {ips[0]}", "success", 3000)
-                else:
-                    self.dashboard.show_message(
-                        "No RDP client found (mstsc, xfreerdp, remmina)", "error", 6000
-                    )
+            async def _rdp() -> str:
+                async with ProxmoxClient(cluster) as c:
+                    ips = await c.agent_ips(node, vmid)
+                target = launcher.pick_rdp_host(ips, near=cluster.host)
+                if not target:
+                    raise RuntimeError("The guest agent reported no usable IPv4 address")
+                if not launcher.open_rdp(target):
+                    raise RuntimeError("No RDP client found (mstsc, xfreerdp, remmina)")
+                return target
 
-            self._run_async(_rdp)
+            self._spawn(
+                _rdp,
+                on_done=lambda ip: self.dashboard.show_message(f"RDP to {ip}", "success", 3000),
+                on_error=self._on_console_failed,
+            )
 
-    def _run_async(self, coro_factory) -> None:  # type: ignore[no-untyped-def]
-        def _run() -> None:
-            try:
-                asyncio.run(coro_factory())
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(coro_factory())
+    def _on_spice_ready(self, path: object) -> None:
+        logger.info("spice file {}", path)
+        self.dashboard.show_message("SPICE handed to remote-viewer", "success", 3000)
+        # the ticket inside is single use and short lived; do not leave it on disk
+        QTimer.singleShot(SPICE_FILE_TTL_MS, lambda p=str(path): launcher.discard(p))
 
-        QTimer.singleShot(0, _run)
+    def _on_console_failed(self, error: object) -> None:
+        logger.error("console failed: {}", error)
+        self.dashboard.show_message(str(error)[:170], "error", 7000)
+
+    # ---------------------------------------------------------------- actions
 
     def _on_action(self, cluster_id: str, node: str, vmid: int, action: str, is_lxc: bool) -> None:
         cluster = next((c for c in self.settings.clusters if c.id == cluster_id), None)
         if not cluster:
             return
-        proxmox_action = {
-            "start": "start",
-            "stop": "stop",
-            "reboot": "reboot",
-            "shutdown": "shutdown",
-        }.get(action, action)
-        want_map = {
+        want = {
             "start": "running",
             "stop": "stopped",
             "shutdown": "stopped",
             "reboot": "running",
-        }
-        want = want_map.get(proxmox_action, "running")
+        }.get(action, "running")
 
-        self.dashboard.set_busy(cluster_id, vmid, is_lxc, proxmox_action)
-        self.dashboard.show_message(f"{proxmox_action} {vmid} on {node}…", "info", 2000)
+        self.dashboard.set_busy(cluster_id, vmid, is_lxc, action)
+        self.dashboard.show_message(f"{action} {vmid} on {node}…", "info", 2000)
 
-        async def _do() -> None:
-            client = ProxmoxClient(cluster)
-            try:
-                upid = await client.vm_action(node, vmid, proxmox_action, is_lxc=is_lxc)
-                logger.info("action {} {} -> {}", proxmox_action, vmid, upid)
-                self.dashboard.show_message(
-                    f"{proxmox_action} sent → waiting for {want}…", "info", 2500
-                )
-                ok = await client.wait_for_guest(node, vmid, want, is_lxc=is_lxc, timeout=45)
-                if ok:
-                    self.dashboard.show_message(f"✓ {vmid} is now {want}", "success", 3000)
-                else:
-                    full = await client.get_guest_status(node, vmid, is_lxc=is_lxc)
-                    self.dashboard.show_message(
-                        f"{vmid} status: {full} (want {want})", "warning", 4000
-                    )
-            except Exception as e:
-                logger.error("action failed: {}", e)
-                self.dashboard.show_message(f"✕ {action} failed: {str(e)[:180]}", "error", 5000)
-            finally:
-                self.dashboard.set_busy(cluster_id, vmid, is_lxc, None)
-                for _ in range(3):
-                    await self._fetch_all()
-                    await asyncio.sleep(1.0)
-                await self._fetch_all()
+        async def _do() -> str:
+            async with ProxmoxClient(cluster) as client:
+                upid = await client.vm_action(node, vmid, action, is_lxc=is_lxc)
+                logger.info("action {} {} -> {}", action, vmid, upid)
+                self.message.emit(f"{action} sent, waiting for {want}…", "info", 2500)
+                if await client.wait_for_guest(node, vmid, want, is_lxc=is_lxc, timeout=45):
+                    return f"{vmid} is now {want}"
+                current = await client.get_guest_status(node, vmid, is_lxc=is_lxc)
+                raise TimeoutError(f"{vmid} is {current}, expected {want}")
 
-        def _run() -> None:
-            try:
-                asyncio.run(_do())
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(_do())
+        def _finish(text: str, kind: str) -> None:
+            self.dashboard.show_message(text, kind, 4000)
+            self.dashboard.set_busy(cluster_id, vmid, is_lxc, None)
+            self.refresh_now()
 
-        QTimer.singleShot(0, _run)
+        self._spawn(
+            _do,
+            on_done=lambda text: _finish(str(text), "success"),
+            on_error=lambda err: _finish(f"{action} failed: {str(err)[:150]}", "error"),
+        )
 
 
 def create_app(argv: list[str] | None = None) -> tuple[QApplication, ProxmoxWidgetApp]:

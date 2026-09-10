@@ -7,6 +7,7 @@ client list.
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import platform
 import shutil
@@ -34,9 +35,28 @@ def open_file(path: Path) -> None:
 
 
 def write_spice_file(vv_content: str, vmid: int) -> Path:
-    path = Path(tempfile.gettempdir()) / f"proxmoxwidget-spice-{vmid}.vv"
-    path.write_text(vv_content, encoding="utf-8")
+    """Write the .vv somewhere only this user can read it.
+
+    It carries a live SPICE ticket, so it must not land in the shared temp
+    directory under a predictable name at the default umask.
+    """
+    directory = Path(tempfile.mkdtemp(prefix="proxmoxwidget-"))  # 0700
+    path = directory / f"spice-{vmid}.vv"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(vv_content)
     return path
+
+
+def discard(path: str | Path) -> None:
+    """Delete a written console file, and its directory, best effort."""
+    p = Path(path)
+    try:
+        p.unlink(missing_ok=True)
+        if p.parent.name.startswith("proxmoxwidget-"):
+            p.parent.rmdir()
+    except OSError as e:
+        logger.debug("could not remove {}: {}", p, e)
 
 
 def open_spice(vv_content: str, vmid: int) -> Path:
@@ -47,6 +67,29 @@ def open_spice(vv_content: str, vmid: int) -> Path:
     else:
         open_file(path)
     return path
+
+
+def pick_rdp_host(ips: list[str], near: str = "") -> str | None:
+    """Choose which address to RDP to.
+
+    A guest often reports several: pick the one on the same network as the
+    Proxmox host, since that is the one the user can reach.
+    """
+    usable = [ip for ip in ips if ip and not ip.startswith(("127.", "169.254."))]
+    if not usable:
+        return None
+    try:
+        host_net = ipaddress.ip_network(f"{near}/24", strict=False) if near else None
+    except ValueError:
+        host_net = None
+    if host_net is not None:
+        for ip in usable:
+            try:
+                if ipaddress.ip_address(ip) in host_net:
+                    return ip
+            except ValueError:
+                continue
+    return usable[0]
 
 
 def rdp_command(host: str, port: int = 3389) -> list[str] | None:

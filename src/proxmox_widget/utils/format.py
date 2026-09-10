@@ -2,11 +2,12 @@ from __future__ import annotations
 
 
 def fmt_bytes(n: int) -> str:
-    for unit in ("B", "KB", "MB", "GB", "TB"):
+    # binary units, matching what the Proxmox UI shows
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
         if abs(n) < 1024:
             return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
         n /= 1024  # type: ignore[assignment]
-    return f"{n:.1f} PB"
+    return f"{n:.1f} PiB"
 
 
 def fmt_uptime(seconds: int) -> str:

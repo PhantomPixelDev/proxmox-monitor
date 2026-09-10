@@ -19,6 +19,10 @@ from proxmox_widget.config.models import (
 
 from .exceptions import ActionFailedError, AuthError, ConnectionError
 
+# interfaces a guest creates for its own containers or VMs, never the address
+# you want to reach the guest on
+VIRTUAL_IFACE_PREFIXES = ("lo", "docker", "veth", "virbr", "vmbr", "br-", "tap", "tun", "zt", "wg")
+
 
 class ProxmoxClient:
     def __init__(self, cluster: ClusterConfig, secret: str | None = None) -> None:
@@ -99,7 +103,7 @@ class ProxmoxClient:
             data = resp.json()
             return data.get("data", data)
         except httpx.ConnectError as e:
-            raise ConnectionError(f"[{self.cluster.id}] connect failed: {e}") from e
+            raise ConnectionError(self._connect_hint(e)) from e
         except httpx.TimeoutException as e:
             raise ConnectionError(f"[{self.cluster.id}] timeout: {e}") from e
         finally:
@@ -120,10 +124,20 @@ class ProxmoxClient:
             data_j = resp.json()
             return data_j.get("data", data_j)
         except httpx.ConnectError as e:
-            raise ConnectionError(f"[{self.cluster.id}] connect failed: {e}") from e
+            raise ConnectionError(self._connect_hint(e)) from e
         finally:
             if close_after:
                 await client.aclose()
+
+    def _connect_hint(self, error: Exception) -> str:
+        """Turn a handshake failure into something the user can act on."""
+        text = str(error)
+        if "CERTIFICATE_VERIFY_FAILED" in text or "certificate verify failed" in text:
+            return (
+                f"[{self.cluster.id}] TLS certificate not trusted — add your CA to the system "
+                "store, or turn off Verify TLS for this cluster in Settings"
+            )
+        return f"[{self.cluster.id}] connect failed: {text}"
 
     async def fetch_nodes(self) -> list[ProxmoxNode]:
         raw = await self._get("/nodes")
@@ -264,10 +278,18 @@ class ProxmoxClient:
         all_vms: list[QemuVm] = []
         all_cts: list[LxcContainer] = []
         all_stor: list[StorageStatus] = []
+        seen_shared: set[str] = set()
         for vms, cts, stor in results:
             all_vms.extend(vms)
             all_cts.extend(cts)
-            all_stor.extend(stor)
+            for st in stor:
+                # a shared store is attached to every node and would otherwise
+                # be listed once per node
+                if st.shared:
+                    if st.storage in seen_shared:
+                        continue
+                    seen_shared.add(st.storage)
+                all_stor.append(st)
         return ClusterHealth(
             cluster_id=self.cluster.id,
             cluster_name=self.cluster.name,
@@ -301,6 +323,10 @@ class ProxmoxClient:
         return (
             f"{self.cluster.base_url}/?{urlencode({'console': 'shell', 'novnc': 1, 'node': node})}"
         )
+
+    async def version(self) -> str:
+        data = await self._get("/version")
+        return str(data.get("version", "unknown")) if isinstance(data, dict) else "unknown"
 
     async def privileges(self) -> set[str]:
         """Every privilege this token holds, flattened across all paths."""
@@ -368,7 +394,8 @@ class ProxmoxClient:
         for iface in ifaces or []:
             if not isinstance(iface, dict):
                 continue
-            if (iface.get("name") or "").lower().startswith("lo"):
+            name = (iface.get("name") or "").lower()
+            if name.startswith(VIRTUAL_IFACE_PREFIXES):
                 continue
             for addr in iface.get("ip-addresses") or []:
                 ip = str(addr.get("ip-address", ""))

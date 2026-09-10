@@ -37,9 +37,9 @@ Every release ships `SHA256SUMS.txt` if you want to verify the download.
 1. Install it, or unzip the portable build anywhere. It starts in the tray. On Windows check the hidden-icons chevron; on macOS look in the menu bar.
 2. In Proxmox, go to **Datacenter → Access → API Tokens → Add**. Pick a user such as `widget@pve`, set the token ID to `monitor`, and copy the secret — it is shown once.
 3. Under **Datacenter → Permissions → Add**, grant that user `PVEAuditor` on `/`. Add `VM.PowerMgmt` for the start, stop and reboot buttons, and `VM.Console` for SPICE.
-4. In the tray, open Settings → Add, and enter the host, port `8006`, the token ID `widget@pve!monitor` and the secret.
+4. In the tray, open Settings → Add, and enter the host, port `8006`, the token ID `widget@pve!monitor` and the secret. Press **Test** to confirm the connection and see what the token is allowed to do.
 
-Self-signed certificates are fine: turn TLS verification off for that cluster. The secret goes to your OS keyring, never to a config file.
+TLS verification is on by default. If your host has a self-signed certificate, either add your CA to the system trust store or untick Verify TLS for that cluster. The secret goes to your OS keyring, never to a config file.
 
 ### Consoles
 
@@ -66,7 +66,7 @@ SPICE and RDP do not need the browser. SPICE needs `VM.Console` on the token, an
 | `401 no ticket` when opening a console | The browser has no Proxmox session. Log in to the web UI once, in the same browser. |
 | SPICE says the token lacks `VM.Console` | Add that privilege to the token in **Datacenter → Permissions**. |
 | RDP says there is no guest agent | Install and enable the QEMU guest agent in that VM; without it the app cannot learn its IP. |
-| Certificate error | Add your CA to the OS trust store, or turn TLS verification off for that cluster. |
+| Certificate not trusted | Self-signed host. Add your CA to the OS trust store, or untick Verify TLS for that cluster. |
 | No tray icon on Windows | Look under the hidden-icons chevron and drag it out. |
 | High CPU | Raise the refresh interval in Settings. |
 
