@@ -45,7 +45,10 @@ TLS verification is on by default. If your host has a self-signed certificate, e
 
 The Console button opens the Proxmox web console in your browser, and that page needs a web-UI login. An API token cannot create a browser session, so if you are not logged in, Proxmox answers `401 no ticket`. Log in to the web UI once, with Open Proxmox, and the console works for as long as that session lasts.
 
-SPICE and RDP do not need the browser. SPICE needs `VM.Console` on the token, and RDP needs the QEMU guest agent installed and running in the VM.
+SPICE and RDP do not need the browser, but the VM has to be set up for them:
+
+- **SPICE** needs `VM.Console` on the token, and the VM's Display set to SPICE (qxl) in its Hardware tab. The default display has no SPICE port.
+- **RDP** needs QEMU Guest Agent ticked in the VM's Options tab *and* the agent service running inside the guest, so the app can ask it for an address. Enabling the option only takes effect after the VM is rebooted.
 
 ## What it does
 
@@ -65,7 +68,8 @@ SPICE and RDP do not need the browser. SPICE needs `VM.Console` on the token, an
 | `403 Forbidden` on start or stop | The token lacks `VM.PowerMgmt`. Everything else keeps working without it. |
 | `401 no ticket` when opening a console | The browser has no Proxmox session. Log in to the web UI once, in the same browser. |
 | SPICE says the token lacks `VM.Console` | Add that privilege to the token in **Datacenter → Permissions**. |
-| RDP says there is no guest agent | Install and enable the QEMU guest agent in that VM; without it the app cannot learn its IP. |
+| RDP says the agent is not answering | The agent service is not running in the guest, or the VM has not been rebooted since you ticked the option. |
+| SPICE says the VM has no SPICE display | Set Display to SPICE (qxl) in the VM's Hardware tab and reboot it. |
 | Certificate not trusted | Self-signed host. Add your CA to the OS trust store, or untick Verify TLS for that cluster. |
 | No tray icon on Windows | Look under the hidden-icons chevron and drag it out. |
 | High CPU | Raise the refresh interval in Settings. |

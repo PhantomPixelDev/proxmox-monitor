@@ -120,7 +120,7 @@ async def test_agent_missing_reads_plainly(monkeypatch):
         raise RuntimeError("Server error '500 No QEMU guest agent configured' for url https://x")
 
     monkeypatch.setattr(client, "_get", fake_get)
-    with pytest.raises(ActionFailedError, match="no QEMU guest agent enabled"):
+    with pytest.raises(ActionFailedError, match="no guest agent enabled"):
         await client.agent_ips("pve", 112)
 
 
@@ -175,3 +175,31 @@ async def test_agent_ips_skips_container_bridges(monkeypatch):
 
     monkeypatch.setattr(client, "_get", fake_get)
     assert await client.agent_ips("pve", 112) == ["192.168.10.55"]
+
+
+@pytest.mark.asyncio
+async def test_spice_without_a_spice_display_says_so(monkeypatch):
+    from proxmox_widget.api.exceptions import ActionFailedError
+
+    client = _client()
+
+    async def fake_post(path, data=None):
+        raise RuntimeError("Server error '500 no spice port' for url https://x")
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    with pytest.raises(ActionFailedError, match="no SPICE display"):
+        await client.spice_config("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_agent_installed_but_silent_says_so(monkeypatch):
+    from proxmox_widget.api.exceptions import ActionFailedError
+
+    client = _client()
+
+    async def fake_get(path):
+        raise RuntimeError("Server error '500 QEMU guest agent is not running' for url https://x")
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    with pytest.raises(ActionFailedError, match="not answering"):
+        await client.agent_ips("pve", 112)

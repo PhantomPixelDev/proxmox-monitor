@@ -358,6 +358,15 @@ class ProxmoxClient:
                     "Token lacks VM.Console — add it in Datacenter, Permissions"
                 ) from e
             raise
+        except Exception as e:
+            msg = str(e)
+            # PVE only opens a SPICE port when the guest has a SPICE display
+            if "no spice port" in msg or ("spice" in msg.lower() and "500" in msg):
+                raise ActionFailedError(
+                    f"VM {vmid} has no SPICE display — set Display to SPICE (qxl) "
+                    "in its Hardware tab, then reboot it"
+                ) from e
+            raise ActionFailedError(f"SPICE unavailable: {msg[:120]}") from e
         if not isinstance(data, dict):
             raise ActionFailedError(f"spiceproxy returned no config for {vmid}")
         return data
@@ -381,9 +390,15 @@ class ProxmoxClient:
         except Exception as e:
             msg = str(e)
             if "No QEMU guest agent configured" in msg:
-                raise ActionFailedError("This VM has no QEMU guest agent enabled") from e
+                raise ActionFailedError(
+                    f"VM {vmid} has no guest agent enabled — tick QEMU Guest Agent "
+                    "in its Options tab, then reboot it"
+                ) from e
             if "not running" in msg:
-                raise ActionFailedError("The guest agent is not responding") from e
+                raise ActionFailedError(
+                    f"Guest agent not answering on VM {vmid} — start the QEMU Guest Agent "
+                    "service inside the guest, and reboot the VM if you only just enabled it"
+                ) from e
             if "403" in msg:
                 raise ActionFailedError(
                     "Token lacks VM.GuestAgent.Audit — add it in Datacenter, Permissions"
