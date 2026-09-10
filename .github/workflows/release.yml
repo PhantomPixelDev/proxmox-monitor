@@ -68,6 +68,13 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}"
           TAG="${TAG#v}"
+          # workflow_dispatch runs from a branch, so the ref is a branch name, not
+          # a version. Inno Setup's VersionInfoVersion only accepts numbers, so a
+          # dry run gets 0.0.0. Tag builds are unaffected.
+          if [[ ! "$TAG" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "ref '$TAG' is not a version — using 0.0.0 for this dry run"
+            TAG="0.0.0"
+          fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "Building standalone for ${{ matrix.os }} tag=$TAG"
           # Windows: standalone folder -> Portable ZIP + Inno Setup installer (no TEMP extraction, ~2s cold start)
