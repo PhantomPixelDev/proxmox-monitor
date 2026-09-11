@@ -3,14 +3,29 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QLinearGradient, QPainter, QPen, QPixmap
 
+try:
+    import proxmox_widget.ui.font_fix  # noqa: F401  # clamp QFont.setPointSize
+except Exception:
+    pass
+
 
 def make_app_icon(size: int = 256) -> QIcon:
+    try:
+        from proxmox_widget.ui.font_fix import ensure_valid_app_font
+
+        ensure_valid_app_font()
+    except Exception:
+        pass
+    size = max(1, int(size))
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
+    if not p.isActive():
+        p.end()
+        return QIcon(pm)
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-    r = size // 8
+    r = max(1, size // 8)
     bg_rect = pm.rect().adjusted(2, 2, -2, -2)
 
     grad = QLinearGradient(bg_rect.topLeft(), bg_rect.bottomRight())
@@ -62,7 +77,7 @@ def make_app_icon(size: int = 256) -> QIcon:
 
     # P letter watermark subtle
     p.setPen(QColor(255, 255, 255, 26))
-    f = QFont("Segoe UI", int(size * 0.18), QFont.Weight.Bold)
+    f = QFont("Segoe UI", max(1, int(size * 0.18)), QFont.Weight.Bold)
     f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
     p.setFont(f)
     # p.drawText(bg_rect, Qt.AlignmentFlag.AlignCenter, "P")
@@ -72,9 +87,19 @@ def make_app_icon(size: int = 256) -> QIcon:
 
 
 def make_tray_icon(size: int = 64, online: bool = True, alerts: int = 0) -> QIcon:
+    try:
+        from proxmox_widget.ui.font_fix import ensure_valid_app_font
+
+        ensure_valid_app_font()
+    except Exception:
+        pass
+    size = max(1, int(size))
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
+    if not p.isActive():
+        p.end()
+        return QIcon(pm)
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     bg = QColor("#e85d04") if online else QColor("#6c7086")
     p.setBrush(QBrush(bg))
@@ -94,12 +119,12 @@ def make_tray_icon(size: int = 64, online: bool = True, alerts: int = 0) -> QIco
         p.setBrush(QBrush(QColor("#2ecc71")))
         p.drawEllipse(int(cx + w // 2 - 6), int(y + 1), 6, 6)
     if alerts:
-        r = size // 4
+        r = max(1, size // 4)
         p.setBrush(QBrush(QColor("#ff3b30")))
         p.setPen(QPen(QColor("#ffffff"), 2))
         p.drawEllipse(size - r - 2, 2, r, r)
         p.setPen(QColor("#ffffff"))
-        f = QFont("Segoe UI", int(r * 0.55), QFont.Weight.Bold)
+        f = QFont("Segoe UI", max(1, int(r * 0.55)), QFont.Weight.Bold)
         p.setFont(f)
         p.drawText(int(size - r - 2), 2, r, r, Qt.AlignmentFlag.AlignCenter, str(min(alerts, 9)))
     p.end()

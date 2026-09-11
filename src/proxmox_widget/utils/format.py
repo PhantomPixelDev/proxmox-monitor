@@ -27,5 +27,14 @@ def fmt_uptime(seconds: int) -> str:
 
 
 def bar(cpu: float, width: int = 10) -> str:
-    filled = int(cpu * width)
-    return "█" * filled + "░" * (width - filled)
+    try:
+        f = float(cpu)
+    except Exception:
+        f = 0.0
+    f = max(0.0, min(1.0, f))
+    w = max(0, int(width))
+    if w == 0:
+        return ""
+    filled = int(f * w)
+    filled = max(0, min(w, filled))
+    return "█" * filled + "░" * (w - filled)

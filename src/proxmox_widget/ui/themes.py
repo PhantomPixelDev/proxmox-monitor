@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import pathlib
 
+try:
+    import proxmox_widget.ui.font_fix  # noqa: F401  # clamp QFont.setPointSize
+except Exception:
+    pass
+
 # --- palettes -----------------------------------------------------------------
 # Kept as dicts so widgets can pull the same colours the stylesheet uses
 # (status accents, chart bars) instead of hardcoding hex twice.
@@ -133,6 +138,14 @@ QPushButton#chip {{
 }}
 QPushButton#chip:hover {{ background: {surface_hi}; color: {text}; }}
 QPushButton#chip:checked {{ background: {accent}; color: {accent_ink}; border-color: {accent}; }}
+QPushButton#menuBtn {{ text-align: left; padding-right: 8px; }}
+QPushButton#menuBtn::menu-indicator {{
+    image: url({asset_chevron});
+    width: 11px;
+    height: 11px;
+    subcontrol-position: right center;
+    right: 4px;
+}}
 
 /* --- search --------------------------------------------------------------- */
 QLineEdit {{
@@ -283,10 +296,14 @@ def _asset(name: str, color: str, size: int = 12) -> str:
 
     from proxmox_widget.ui import icons
 
+    size = max(1, int(size))
     slug = f"pw-{name}-{color.lstrip('#')}-{size}.png"
     path = pathlib.Path(tempfile.gettempdir()) / slug
     if not path.exists():
-        icons.pixmap(name, size, color, stroke=2.6, dpr=2.0).save(str(path), "PNG")
+        try:
+            icons.pixmap(name, size, color, stroke=2.6, dpr=2.0).save(str(path), "PNG")
+        except Exception:
+            return ""
     return path.as_posix()
 
 
@@ -311,9 +328,19 @@ def palette_for(theme: str, system_is_dark: bool = True) -> dict[str, str]:
 
 
 def qss_for(theme: str, system_is_dark: bool = True) -> str:
+    try:
+        from proxmox_widget.ui.font_fix import ensure_valid_app_font, install_qfont_suppress_filter
+
+        install_qfont_suppress_filter()
+        ensure_valid_app_font()
+    except Exception:
+        pass
     key = theme if theme in ("dark", "light") else ("dark" if system_is_dark else "light")
     cached = _QSS_CACHE.get(key)
     if cached is None:
         cached = _build(DARK if key == "dark" else LIGHT)
+        for token in ("font-size: -", "font: -", "font-size: 0px", "font-size: -1"):
+            if token in cached:
+                cached = cached.replace(token, "font-size: 1px")
         _QSS_CACHE[key] = cached
     return cached

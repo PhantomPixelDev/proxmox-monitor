@@ -12,6 +12,11 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QLabel
 
 try:
+    import proxmox_widget.ui.font_fix  # noqa: F401  # clamp QFont.setPointSize
+except Exception:
+    pass
+
+try:
     from PySide6.QtSvg import QSvgRenderer
 except ImportError:  # pragma: no cover - Qt build without SVG
     QSvgRenderer = None  # type: ignore[assignment]
@@ -44,6 +49,7 @@ PATHS: dict[str, str] = {
     "console": '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9.5 3 2.5-3 2.5"/><path d="M12.5 15h4.5"/>',
     "monitor": '<rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M6.5 8h5"/>',
     "remote": '<rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M6.5 21h11"/><path d="M9.5 9.5h5v5h-5z"/>',
+    "terminal": '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6.5 9 3 2.75-3 2.75"/><path d="M12.5 15h5"/><path d="M5 6.8 6.8 5M9 6.8 10.8 5" transform="translate(-2.2 0)"/>',
     "external": '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V7.5A1.5 1.5 0 0 1 5 6h4.5"/>',
     "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/>',
     "refresh": '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3.5V9h-5.5"/>',
@@ -71,22 +77,36 @@ def svg_markup(name: str, color: str = "currentColor", stroke: float = 2.0) -> s
 def pixmap(
     name: str, size: int = 16, color: str = "#a5abc9", stroke: float = 2.0, dpr: float = 2.0
 ) -> QPixmap:
+    try:
+        from proxmox_widget.ui.font_fix import ensure_valid_app_font
+
+        ensure_valid_app_font()
+    except Exception:
+        pass
+    size = max(1, int(size))
+    dpr = max(1.0, float(dpr)) if dpr else 2.0
+    stroke = max(0.5, float(stroke))
     key = (name, size, color, stroke, dpr)
     hit = _CACHE.get(key)
     if hit is not None:
         return hit
     px = max(1, int(size * dpr))
     pm = QPixmap(px, px)
-    pm.setDevicePixelRatio(dpr)
+    if pm.isNull():
+        pm = QPixmap(1, 1)
+        pm.setDevicePixelRatio(dpr)
+    else:
+        pm.setDevicePixelRatio(dpr)
     pm.fill(Qt.GlobalColor.transparent)
     if QSvgRenderer is not None:
         renderer = QSvgRenderer(QByteArray(svg_markup(name, color, stroke).encode("utf-8")))
         painter = QPainter(pm)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        # explicit target rect in logical units: painter.viewport() is in device
-        # pixels, so letting QSvgRenderer pick it crops the icon on HiDPI
-        renderer.render(painter, QRectF(0.0, 0.0, float(size), float(size)))
-        painter.end()
+        if painter.isActive():
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            # explicit target rect in logical units: painter.viewport() is in device
+            # pixels, so letting QSvgRenderer pick it crops the icon on HiDPI
+            renderer.render(painter, QRectF(0.0, 0.0, float(size), float(size)))
+            painter.end()
     _CACHE[key] = pm
     return pm
 
@@ -96,10 +116,12 @@ def icon(name: str, size: int = 16, color: str = "#a5abc9", stroke: float = 2.0)
 
 
 def label(name: str, size: int = 15, color: str = "#a5abc9", stroke: float = 2.0) -> QLabel:
+    size = max(1, int(size))
     lbl = QLabel()
     lbl.setFixedSize(size, size)
     lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
     lbl.setStyleSheet("background: transparent; border: none;")
     dpr = lbl.devicePixelRatioF() or 2.0
-    lbl.setPixmap(pixmap(name, size, color, stroke, max(2.0, dpr)))
+    dpr = max(2.0, float(dpr))
+    lbl.setPixmap(pixmap(name, size, color, stroke, dpr))
     return lbl

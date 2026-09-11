@@ -4,6 +4,29 @@ import os
 import pathlib
 import sys
 
+try:
+    from proxmox_widget.ui.font_fix import install_qfont_suppress_filter as _early_install
+
+    _early_install()
+except Exception:
+    try:
+        from PySide6.QtCore import qInstallMessageHandler as _qIMH
+
+        def _fallback_filter(t, ctx, msg):  # type: ignore[no-untyped-def]
+            m = str(msg)
+            if "Point size <= 0" in m and "setPointSize" in m:
+                return
+            try:
+                import sys as _sys
+
+                _sys.stderr.write(m + "\n")
+            except Exception:
+                pass
+
+        _qIMH(_fallback_filter)  # type: ignore[arg-type]
+    except Exception:
+        pass
+
 from loguru import logger
 from platformdirs import user_log_dir
 
@@ -41,7 +64,23 @@ def main() -> int:
         sys.argv.remove("--dev")
     if "--console" in sys.argv:
         sys.argv.remove("--console")
+    try:
+        from proxmox_widget.ui.font_fix import install_qfont_suppress_filter
+
+        install_qfont_suppress_filter()
+    except Exception:
+        pass
+    try:
+        import proxmox_widget.ui.font_fix  # noqa: F401  # ensure QFont clamp active before any font
+    except Exception:
+        pass
     app, w = create_app()
+    try:
+        from proxmox_widget.ui.font_fix import ensure_valid_app_font
+
+        ensure_valid_app_font(app)
+    except Exception:
+        pass
     w.start()
     return app.exec()
 
