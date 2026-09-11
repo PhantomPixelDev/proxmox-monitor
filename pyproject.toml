@@ -1,8 +1,8 @@
 [project]
 name = "proxmox-widget"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Lightweight cross-platform system-tray client for Proxmox VE"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "ProxmoxWidget" }]
@@ -13,9 +13,14 @@ classifiers = [
   "Intended Audience :: System Administrators",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
   "PySide6>=6.6",
@@ -26,6 +31,7 @@ dependencies = [
   "keyring>=25.0",
   "psutil>=6.0",
   "loguru>=0.7",
+  "filelock==3.13",
 ]
 
 [project.optional-dependencies]
@@ -40,8 +46,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/proxmox-widget/proxmox-widget"
-Issues = "https://github.com/proxmox-widget/proxmox-widget/issues"
+Homepage = "https://github.com/PhantomPixelDev/proxmox-monitor"
+Issues = "https://github.com/PhantomPixelDev/proxmox-monitor/issues"
 
 [project.scripts]
 proxmox-widget = "proxmox_widget.__main__:main"
@@ -50,8 +56,14 @@ proxmox-widget = "proxmox_widget.__main__:main"
 proxmox-widget-gui = "proxmox_widget.__main__:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/proxmox_widget/_version.py"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/proxmox_widget/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/proxmox_widget"]
@@ -75,10 +87,10 @@ typeCheckingMode = "standard"
 pythonVersion = "3.11"
 reportAny = false
 reportMissingTypeArgument = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownParameterType = false
-reportUnknownArgumentType = false
+reportUnknownMemberType = true
+reportUnknownVariableType = true
+reportUnknownParameterType = true
+reportUnknownArgumentType = true
 reportUnknownLambdaType = false
 reportOptionalMemberAccess = false
 reportAttributeAccessIssue = false
@@ -89,7 +101,7 @@ reportArgumentType = false
 testpaths = ["tests"]
 asyncio_mode = "auto"
 qt_api = "pyside6"
-addopts = "-v --cov=proxmox_widget --cov-report=term-missing"
+addopts = "-v --cov=proxmox_widget --cov-report=term-missing --cov-fail-under=70"
 
 [tool.coverage.run]
 source = ["src/proxmox_widget"]
@@ -98,3 +110,4 @@ branch = true
 [tool.coverage.report]
 skip_covered = false
 show_missing = true
+fail_under = 70
