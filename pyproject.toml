@@ -59,9 +59,6 @@ proxmox-widget-gui = "proxmox_widget.__main__:main"
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-[tool.hatch.version]
-path = "src/proxmox_widget/_version.py"
-
 [tool.hatch.build.hooks.vcs]
 version-file = "src/proxmox_widget/_version.py"
 
