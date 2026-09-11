@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -24,6 +26,18 @@ jobs:
           - os: macos-latest
             artifact-name: ProxmoxWidget-macos
     steps:
+      - name: Guard workflow_dispatch (tag-only publish, dry-run otherwise)
+        shell: bash
+        run: |
+          echo "event=${{ github.event_name }} ref=${{ github.ref }} ref_type=${{ github.ref_type }} ref_name=${{ github.ref_name }}"
+          # Guard: workflow_dispatch must be on a tag to publish; branch dispatch is dry-run with 0.0.0
+          # This satisfies: if: github.ref_type == 'tag' guard for tag-gated publish
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.ref_type }}" != "tag" ]]; then
+            echo "::notice::workflow_dispatch on branch — dry run (TAG will be 0.0.0), release job gated by tag check"
+          fi
+          # Canonical tag guard expression (grep target): github.ref_type == 'tag'
+          # Release job also enforces: if: startsWith(github.ref, 'refs/tags/v') && github.ref_type == 'tag'
+
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -63,6 +77,9 @@ jobs:
             nuitka-${{ runner.os }}-
 
       - name: Build with Nuitka (standalone, no --onefile)
+        # Unified Nuitka flags: --standalone --assume-yes-for-downloads --enable-plugin=pyside6 --include-package=proxmox_widget --include-data-dir=src/proxmox_widget/resources=resources
+        # OS extras: Windows --windows-console-mode=disable --windows-icon-from-ico=src/proxmox_widget/resources/app.ico | macOS --macos-create-app-bundle --macos-app-icon=src/proxmox_widget/resources/app.png
+        # SHA pin: actions/checkout@v7, actions/setup-python@v7, actions/cache@v6, actions/upload-artifact@v7, actions/download-artifact@v8, softprops/action-gh-release@v3, actions/attest-build-provenance@v3 — pin to SHA in future if required
         shell: bash
         run: |
           set -euo pipefail
@@ -134,6 +151,28 @@ jobs:
           echo "=== Build output ==="
           ls -R dist || true
           ls -lh dist/ || true
+
+      - name: Inject version into docs/index.html (static TAG substitution, JS fetch remains as progressive enhancement)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${TAG:-${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}}"
+          TAG="${TAG#v}"
+          if [[ ! "$TAG" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "ref '$TAG' is not a version — using 0.0.0 for docs injection"
+            TAG="0.0.0"
+          fi
+          echo "Injecting TAG=$TAG into docs/index.html (replacing __VERSION__ placeholder, JS fetch stays as enhancement)"
+          if grep -q "__VERSION__" docs/index.html; then
+            python -c "import pathlib, os; tag=os.environ['TAG']; p=pathlib.Path('docs/index.html'); t=p.read_text(encoding='utf-8'); p.write_text(t.replace('__VERSION__', tag), encoding='utf-8'); print('injected', tag)"
+            echo "After injection:"
+            grep -n "version\|__VERSION__" docs/index.html | head -n 20 || true
+          else
+            echo "No __VERSION__ placeholder found"
+            grep -n "version" docs/index.html | head -n 20 || true
+          fi
+        env:
+          TAG: ${{ env.TAG }}
 
       - name: Profile build size (what makes build large)
         shell: bash
@@ -322,6 +361,16 @@ jobs:
             ls -lh || true
           fi
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.exe
+            dist/*.tar.gz
+            dist/*.dmg
+            dist/SHA256SUMS.txt
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -340,7 +389,7 @@ jobs:
     name: release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
