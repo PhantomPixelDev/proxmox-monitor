@@ -1,4 +1,3 @@
-from .monitor import Monitor
 from .notifier import Notifier
 
-__all__ = ["Monitor", "Notifier"]
+__all__ = ["Notifier"]
