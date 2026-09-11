@@ -41,21 +41,23 @@ Every release ships `SHA256SUMS.txt` if you want to verify the download.
 
 TLS verification is on by default. If your host has a self-signed certificate, either add your CA to the system trust store or untick Verify TLS for that cluster. The secret goes to your OS keyring, never to a config file.
 
-### Consoles
+### Consoles and remote access
 
-The Console button opens the Proxmox web console in your browser, and that page needs a web-UI login. An API token cannot create a browser session, so if you are not logged in, Proxmox answers `401 no ticket`. Log in to the web UI once, with Open Proxmox, and the console works for as long as that session lasts.
+Each guest card has a **Console** button (noVNC in the browser) and a **Connect ▾** menu with every other way in. Node cards have **SSH** and **Shell** (noVNC).
 
-SPICE and RDP do not need the browser, but the VM has to be set up for them:
-
+- **SSH** opens in your own terminal — Windows Terminal, GNOME Terminal, Terminal.app, whatever your desktop uses. Your keys, agent and `known_hosts` work as they do everywhere else, and nothing is stored by the app except the login name and port you set per cluster in Settings → Remote access. SSH always connects to the Proxmox node itself; from there `qm terminal` or `pct enter` reaches the guest.
+- **LXC console** opens the Proxmox web console for a container — same browser-session rule as noVNC.
 - **SPICE** needs `VM.Console` on the token, and the VM's Display set to SPICE (qxl) in its Hardware tab. The default display has no SPICE port.
-- **RDP** needs QEMU Guest Agent ticked in the VM's Options tab *and* the agent service running inside the guest, so the app can ask it for an address. On Windows that means installing virtio-win guest tools; ticking the option alone does nothing. Enabling it only takes effect after the VM is stopped and started, not rebooted from inside.
+- **RDP** builds a real `.rdp` file — address, the RDP port and username from Settings — and hands it to `mstsc`, `xfreerdp` or Remmina. It needs QEMU Guest Agent ticked in the VM's Options tab *and* the agent service running inside the guest, so the app can ask it for an address. On Windows that means installing virtio-win guest tools; ticking the option alone does nothing. Enabling it only takes effect after the VM is stopped and started, not rebooted from inside.
+
+The noVNC Console button opens the Proxmox web console in your browser, and that page needs a web-UI login. An API token cannot create a browser session, so if you are not logged in, Proxmox answers `401 no ticket`. Log in to the web UI once, with Open Proxmox, and the console works for as long as that session lasts.
 
 ## What it does
 
 - CPU, memory and disk for every node, VM and LXC container, refreshed on a timer you set.
 - Search on each tab by name, VMID, node or status, plus a Running-only toggle.
 - Start, stop and reboot, waiting until the guest actually reaches that state.
-- Consoles in one click: noVNC for any guest, SPICE through `remote-viewer`, RDP to the address the QEMU guest agent reports, and a shell for each node.
+- Consoles in one click: noVNC for any guest, SPICE through `remote-viewer`, RDP through a generated `.rdp` file, SSH in your own terminal for every node, and a shell for each node.
 - Several clusters at once, with offline ones flagged in the tray icon and tooltip.
 - Dark and light themes that follow your OS.
 
@@ -70,9 +72,26 @@ SPICE and RDP do not need the browser, but the VM has to be set up for them:
 | SPICE says the token lacks `VM.Console` | Add that privilege to the token in **Datacenter → Permissions**. |
 | RDP says the agent is not answering | The agent service is not running in the guest, or the VM has not been rebooted since you ticked the option. |
 | SPICE says the VM has no SPICE display | Set Display to SPICE (qxl) in the VM's Hardware tab and reboot it. |
-| Certificate not trusted | Self-signed host. Add your CA to the OS trust store, or untick Verify TLS for that cluster. |
+| SSH says no ssh client found | Install the OpenSSH client: Windows — Optional Features → OpenSSH Client; Linux — `openssh-client`; macOS has it built in. |
+| Certificate not trusted | Self-signed host. Add your CA to the OS trust store, or untick Verify TLS for that cluster. When Verify TLS is off (or a custom CA bundle is set) the cert is pinned on first connect via `trust.json` (TOFU) and blocks if the fingerprint changes. |
+| `certificate fingerprint mismatch` | The host cert changed after the first pin. If you rotated the cert, delete `trust.json` in the config dir and reconnect; otherwise investigate a possible MITM. |
 | No tray icon on Windows | Look under the hidden-icons chevron and drag it out. |
 | High CPU | Raise the refresh interval in Settings. |
+
+### Least-privilege role
+
+Create a read-only role with only the privileges the widget needs, then grant it on `/`:
+
+```bash
+pveum role add PVEWidgetAuditor --privs Sys.Audit,VM.Audit,VM.Monitor,Datastore.Audit
+pveum acl modify / --users widget@pve --roles PVEWidgetAuditor
+# optional: allow Start/Stop/Reboot from the widget
+pveum role modify PVEWidgetAuditor --privs Sys.Audit,VM.Audit,VM.Monitor,Datastore.Audit,VM.PowerMgmt
+# optional: allow SPICE console
+# pveum role modify PVEWidgetAuditor --privs Sys.Audit,VM.Audit,VM.Monitor,Datastore.Audit,VM.PowerMgmt,VM.Console
+```
+
+`Verify TLS` stays on by default; provide a `ca_bundle` path to pin a private CA instead of disabling verification. `trust.json` lives beside `config.json` in the platform config directory and maps `cluster_id` to the pinned `sha256` fingerprint.
 
 For logs, start it with `--dev`:
 
