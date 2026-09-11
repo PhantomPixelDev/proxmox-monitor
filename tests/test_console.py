@@ -68,17 +68,118 @@ async def test_agent_ips_skips_loopback_and_ipv6(monkeypatch):
 
 
 def test_rdp_command_per_platform(monkeypatch):
+    launcher._which_cache.clear()
     monkeypatch.setattr(launcher.platform, "system", lambda: "Windows")
     assert launcher.rdp_command("10.0.0.5") == ["mstsc", "/v:10.0.0.5:3389"]
 
+    launcher._which_cache.clear()
     monkeypatch.setattr(launcher.platform, "system", lambda: "Linux")
     monkeypatch.setattr(launcher.shutil, "which", lambda name: None)
     assert launcher.rdp_command("10.0.0.5") is None
 
+    launcher._which_cache.clear()
     monkeypatch.setattr(
         launcher.shutil, "which", lambda name: "/usr/bin/xfreerdp" if name == "xfreerdp" else None
     )
     assert launcher.rdp_command("10.0.0.5") == ["/usr/bin/xfreerdp", "/v:10.0.0.5:3389"]
+
+
+def test_ssh_command_default_and_custom_port():
+    assert launcher.ssh_command("pve.lan", "root", 22) == ["ssh", "-tt", "root@pve.lan"]
+    assert launcher.ssh_command("pve.lan", "root", 2222) == [
+        "ssh",
+        "-tt",
+        "-p",
+        "2222",
+        "root@pve.lan",
+    ]
+
+
+def test_terminal_command_picks_the_first_wrapper(monkeypatch):
+    argv = ["ssh", "-tt", "root@pve"]
+
+    launcher._which_cache.clear()
+    monkeypatch.setattr(launcher.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(
+        launcher.shutil, "which", lambda name: "C:/wt.exe" if name == "wt" else None
+    )
+    assert launcher.terminal_command(argv) == ["C:/wt.exe", "--", *argv]
+
+    launcher._which_cache.clear()
+    monkeypatch.setattr(launcher.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        launcher.shutil,
+        "which",
+        lambda name: "/usr/bin/konsole" if name == "konsole" else None,
+    )
+    assert launcher.terminal_command(argv) == ["/usr/bin/konsole", "-e", *argv]
+
+    # nothing installed — caller falls back to the bare ssh argv
+    launcher._which_cache.clear()
+    monkeypatch.setattr(launcher.shutil, "which", lambda name: None)
+    assert launcher.terminal_command(argv) is None
+
+
+@pytest.mark.asyncio
+async def test_open_ssh_needs_the_ssh_binary(monkeypatch):
+    monkeypatch.setattr(launcher.shutil, "which", lambda name: None)
+    assert launcher.open_ssh("pve.lan") is False
+
+
+@pytest.mark.asyncio
+async def test_open_ssh_launches_a_terminal(monkeypatch):
+    launched = []
+    launcher._which_cache.clear()
+
+    monkeypatch.setattr(
+        launcher.shutil, "which", lambda name: "C:/Windows/System32/OpenSSH/ssh.exe"
+    )
+    monkeypatch.setattr(
+        launcher,
+        "terminal_command",
+        lambda argv: ["wt.exe", "--", *argv],
+    )
+    monkeypatch.setattr(launcher.subprocess, "Popen", lambda cmd: launched.append(cmd))
+    assert launcher.open_ssh("pve.lan", "root", 2222) is True
+    assert launched[0][0] == "wt.exe"
+    assert launched[0][-1] == "root@pve.lan"
+
+
+def test_rdp_file_carries_address_port_and_user():
+    text = launcher.build_rdp_file("10.0.0.5", 3390, "Admin")
+    lines = text.split("\r\n")
+    assert "full address:s:10.0.0.5:3390" in lines
+    assert "username:s:Admin" in lines
+    assert "smart sizing:i:1" in lines
+    assert text.endswith("\r\n"), "mstsc expects CRLF line endings"
+
+
+def test_rdp_file_without_user_omits_the_line():
+    assert "username" not in launcher.build_rdp_file("10.0.0.5")
+
+
+def test_rdp_file_is_written_private_and_removable():
+    path = launcher.write_rdp_file(launcher.build_rdp_file("10.0.0.5"), 7)
+    try:
+        assert path.name == "rdp-7.rdp"
+        assert "full address:s:10.0.0.5:3389" in path.read_text(encoding="utf-8")
+    finally:
+        launcher.discard(path)
+    assert not path.exists()
+
+
+def test_open_rdp_file_uses_mstsc_on_windows(monkeypatch):
+    launched = []
+    monkeypatch.setattr(launcher.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(launcher.subprocess, "Popen", lambda cmd: launched.append(cmd))
+    assert launcher.open_rdp_file(launcher.Path("C:/tmp/x.rdp")) is True
+    assert launched[0] == ["mstsc", "C:\\tmp\\x.rdp"]
+
+
+def test_open_rdp_file_reports_no_client(monkeypatch):
+    monkeypatch.setattr(launcher.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(launcher.shutil, "which", lambda name: None)
+    assert launcher.open_rdp_file(launcher.Path("/tmp/x.rdp")) is False
 
 
 @pytest.mark.asyncio
@@ -124,6 +225,22 @@ async def test_agent_missing_reads_plainly(monkeypatch):
     monkeypatch.setattr(client, "_get", fake_get)
     with pytest.raises(ActionFailedError, match="no guest agent enabled"):
         await client.agent_ips("pve", 112)
+
+
+@pytest.mark.asyncio
+async def test_lxc_ips_reads_inet_and_skips_bridges(monkeypatch):
+    client = _client()
+
+    async def fake_get(path):
+        assert path == "/nodes/pve/lxc/200/interfaces"
+        return [
+            {"name": "lo", "inet": "127.0.0.1/8"},
+            {"name": "eth0", "inet": "192.168.10.77/24"},
+            {"name": "docker0", "inet": "172.17.0.1/16"},
+        ]
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    assert await client.lxc_ips("pve", 200) == ["192.168.10.77"]
 
 
 def test_rdp_prefers_the_address_on_the_proxmox_network():

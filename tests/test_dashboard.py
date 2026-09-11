@@ -44,9 +44,13 @@ def dash(qapp):
 def test_search_filters_and_counts(dash, qapp):
     dash._search[VMS].setText("vm-03")
     qapp.processEvents()
+    QTest.qWait(200)
+    qapp.processEvents()
     assert dash._counts[VMS].text() == "1/12"
 
     dash._search[VMS].clear()
+    qapp.processEvents()
+    QTest.qWait(200)
     qapp.processEvents()
     assert dash._counts[VMS].text() == "12"
 
@@ -62,9 +66,13 @@ def test_running_toggle_hides_stopped_guests(dash, qapp):
 def test_search_matches_vmid_and_node(dash, qapp):
     dash._search[VMS].setText("105")
     qapp.processEvents()
+    QTest.qWait(200)
+    qapp.processEvents()
     assert dash._counts[VMS].text() == "1/12"
 
     dash._search[CTS].setText("pve")
+    qapp.processEvents()
+    QTest.qWait(200)
     qapp.processEvents()
     assert dash._counts[CTS].text() == "1"
 
@@ -89,4 +97,19 @@ def test_refresh_keeps_the_scroll_position(dash, qapp):
 def test_empty_state_mentions_the_query(dash, qapp):
     dash._search[VMS].setText("nothing-matches-this")
     qapp.processEvents()
+    QTest.qWait(200)
+    qapp.processEvents()
     assert dash._counts[VMS].text() == "0/12"
+
+
+def test_connect_menu_lists_ssh_rdp_and_spice_for_vms(dash):
+    from PySide6.QtWidgets import QPushButton
+
+    by_menu = {}
+    for b in dash.findChildren(QPushButton):
+        if b.text().strip() == "Connect":
+            labels = [a.text() for a in b.menu().actions()]
+            by_menu[tuple(labels)] = by_menu.get(tuple(labels), 0) + 1
+    assert by_menu, "every guest card should carry a Connect menu button"
+    assert by_menu[("SSH", "RDP", "SPICE")] == 12, "one menu per VM"
+    assert by_menu[("SSH", "LXC console")] == 1, "one menu for the container"
