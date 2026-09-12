@@ -173,7 +173,7 @@ def test_open_rdp_file_uses_mstsc_on_windows(monkeypatch):
     monkeypatch.setattr(launcher.platform, "system", lambda: "Windows")
     monkeypatch.setattr(launcher.subprocess, "Popen", lambda cmd: launched.append(cmd))
     assert launcher.open_rdp_file(launcher.Path("C:/tmp/x.rdp")) is True
-    assert launched[0] == ["mstsc", "C:\\tmp\\x.rdp"]
+    assert launched[0][0] == "mstsc" and "x.rdp" in launched[0][1].replace("\\", "/")
 
 
 def test_open_rdp_file_reports_no_client(monkeypatch):

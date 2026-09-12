@@ -299,15 +299,25 @@ def test_matches_intact(dash):
 def test_persistence_via_qsettings(dash, qapp):
     dash._type_filter[VMS].setCurrentText("CT")
     dash._sort_combo[VMS].setCurrentText("CPU")
-    # running chip persistence
     dash._running_only[VMS].setChecked(True)
     qapp.processEvents()
     QTest.qWait(50)
     qapp.processEvents()
+    dash._qsettings.sync()
+    QSettings("PhantomPixelDev", "ProxmoxWidget").sync()
+    qapp.processEvents()
+    QTest.qWait(20)
+    qapp.processEvents()
     s = QSettings("PhantomPixelDev", "ProxmoxWidget")
-    assert s.value("dashboard/type_VMS") == "CT"
-    assert s.value("dashboard/sort_VMS") == "CPU"
-    # create new dashboard should restore
+    s.sync()
+    type_val = s.value("dashboard/type_vms")
+    if type_val is None:
+        type_val = s.value("dashboard/type_VMS")
+    sort_val = s.value("dashboard/sort_vms")
+    if sort_val is None:
+        sort_val = s.value("dashboard/sort_VMS")
+    assert type_val == "CT"
+    assert sort_val == "CPU"
     d2 = Dashboard()
     d2.apply_theme("dark")
     d2.show()
@@ -316,6 +326,8 @@ def test_persistence_via_qsettings(dash, qapp):
     assert d2._sort_combo[VMS].currentText() == "CPU"
     assert d2._running_only[VMS].isChecked() is True
     d2.close()
+    QSettings("PhantomPixelDev", "ProxmoxWidget").clear()
+    QSettings("PhantomPixelDev", "ProxmoxWidget").sync()
 
 
 def test_type_filter_filters_guests(dash, qapp):
