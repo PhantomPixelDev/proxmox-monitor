@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip hatchling hatch-vcs
           pip install -e ".[dev]"
 
       - name: Ruff check
@@ -81,7 +81,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip hatchling hatch-vcs
           pip install -e ".[dev]"
 
       - name: Pytest smoke (no Qt)
@@ -110,7 +110,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip hatchling hatch-vcs
           pip install -e ".[dev]"
 
       - name: Capture screenshots (--mock, 7 PNGs)
