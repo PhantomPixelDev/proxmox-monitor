@@ -7,10 +7,10 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
-# Cancel superseded runs on same branch/PR
+# Allow concurrent runs — don't cancel in-progress CI (was canceling rapid pushes)
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
