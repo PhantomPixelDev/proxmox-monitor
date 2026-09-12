@@ -71,6 +71,7 @@ packages = ["src/proxmox_widget"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = ["src/proxmox_widget/_version.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C4", "UP", "SIM", "RUF"]
