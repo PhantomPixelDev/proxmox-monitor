@@ -19,13 +19,6 @@ import os
 import pathlib
 import sys
 
-# Force offscreen when generating mock screenshots (CI / headless).
-# Under xvfb Qt still prefers the xcb plugin which needs a full xcb stack
-# (libxcb-cursor0, libxcb-icccm4, ...). Offscreen renders without a display
-# server and avoids the "Could not load the Qt platform plugin 'xcb'" abort.
-# Only applied for --mock so local live captures keep native font rendering.
-if "--mock" in sys.argv:
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # 2x so the PNGs stay sharp when the site renders them at CSS width.
 os.environ.setdefault("QT_SCALE_FACTOR", "2")
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
