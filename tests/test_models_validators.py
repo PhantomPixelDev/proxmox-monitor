@@ -8,12 +8,18 @@ from proxmox_widget.config.models import AppSettings, AuthMode, ClusterConfig
 
 
 def _valid_kwargs(**overrides):
-    base = dict(id="pve-home", name="PVE Home", host="192.168.1.10", token_id="root@pam!widget")
+    base = {
+        "id": "pve-home",
+        "name": "PVE Home",
+        "host": "192.168.1.10",
+        "token_id": "root@pam!widget",
+    }
     base.update(overrides)
     return base
 
 
 # ID regex
+
 
 def test_id_valid():
     c = ClusterConfig(**_valid_kwargs(id="ab"))
@@ -48,6 +54,7 @@ def test_id_max_len_passes():
 
 
 # host
+
 
 def test_host_ip_passes_and_lowered():
     c = ClusterConfig(**_valid_kwargs(host="192.168.1.10"))
@@ -92,6 +99,7 @@ def test_host_with_port_scheme_rejects_slash():
 
 # token_id
 
+
 def test_token_without_bang_rejects_in_token_mode():
     with pytest.raises(ValidationError, match="token_id"):
         ClusterConfig(**_valid_kwargs(token_id="root@pamwidget"))
@@ -110,6 +118,7 @@ def test_token_without_bang_passes_in_password_mode():
 
 
 # ca_bundle
+
 
 def test_ca_bundle_none_passes():
     c = ClusterConfig(**_valid_kwargs(ca_bundle=None))
@@ -134,6 +143,7 @@ def test_ca_bundle_existing_path_passes():
 
 
 # config_version migration
+
 
 def test_config_version_default_is_2():
     s = AppSettings()

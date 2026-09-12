@@ -1574,7 +1574,9 @@ class Dashboard(QWidget):
             top.addWidget(cap, 1)
             tl.addLayout(top)
             val = QLabel(value)
-            val.setStyleSheet(f"color: {self.pal['text']}; font-size: {_fs(15)}px; font-weight: 700;")
+            val.setStyleSheet(
+                f"color: {self.pal['text']}; font-size: {_fs(15)}px; font-weight: 700;"
+            )
             tl.addWidget(val)
             row.addWidget(tile, 1)
         return row

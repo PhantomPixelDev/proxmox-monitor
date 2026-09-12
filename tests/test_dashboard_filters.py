@@ -12,19 +12,92 @@ from proxmox_widget.ui.dashboard import CTS, NODES, VMS, Dashboard
 
 
 def _health_mixed():
-    n1 = ProxmoxNode(node="pve", status="online", cpu=0.2, maxcpu=4, mem=4000000000, maxmem=16000000000)
-    n2 = ProxmoxNode(node="pve2", status="online", cpu=0.3, maxcpu=4, mem=4000000000, maxmem=16000000000)
+    n1 = ProxmoxNode(
+        node="pve", status="online", cpu=0.2, maxcpu=4, mem=4000000000, maxmem=16000000000
+    )
+    n2 = ProxmoxNode(
+        node="pve2", status="online", cpu=0.3, maxcpu=4, mem=4000000000, maxmem=16000000000
+    )
     vms = [
-        QemuVm(vmid=100, name="alpha", node="pve", status="running", cpus=2, cpu=0.9, mem=1000000000, maxmem=2000000000, uptime=1000),
-        QemuVm(vmid=101, name="beta", node="pve", status="running", cpus=2, cpu=0.2, mem=1000000000, maxmem=2000000000, uptime=5000),
-        QemuVm(vmid=102, name="gamma", node="pve2", status="running", cpus=2, cpu=0.5, mem=1000000000, maxmem=2000000000, uptime=3000),
-        QemuVm(vmid=103, name="delta", node="pve2", status="stopped", cpus=2, cpu=0.0, mem=0, maxmem=2000000000, uptime=0),
+        QemuVm(
+            vmid=100,
+            name="alpha",
+            node="pve",
+            status="running",
+            cpus=2,
+            cpu=0.9,
+            mem=1000000000,
+            maxmem=2000000000,
+            uptime=1000,
+        ),
+        QemuVm(
+            vmid=101,
+            name="beta",
+            node="pve",
+            status="running",
+            cpus=2,
+            cpu=0.2,
+            mem=1000000000,
+            maxmem=2000000000,
+            uptime=5000,
+        ),
+        QemuVm(
+            vmid=102,
+            name="gamma",
+            node="pve2",
+            status="running",
+            cpus=2,
+            cpu=0.5,
+            mem=1000000000,
+            maxmem=2000000000,
+            uptime=3000,
+        ),
+        QemuVm(
+            vmid=103,
+            name="delta",
+            node="pve2",
+            status="stopped",
+            cpus=2,
+            cpu=0.0,
+            mem=0,
+            maxmem=2000000000,
+            uptime=0,
+        ),
     ]
     cts = [
-        LxcContainer(vmid=200, name="ct-alpha", node="pve", status="running", cpus=1, cpu=0.7, mem=512000000, maxmem=1<<30, uptime=2000),
-        LxcContainer(vmid=201, name="ct-beta", node="pve2", status="running", cpus=1, cpu=0.1, mem=512000000, maxmem=1<<30, uptime=6000),
+        LxcContainer(
+            vmid=200,
+            name="ct-alpha",
+            node="pve",
+            status="running",
+            cpus=1,
+            cpu=0.7,
+            mem=512000000,
+            maxmem=1 << 30,
+            uptime=2000,
+        ),
+        LxcContainer(
+            vmid=201,
+            name="ct-beta",
+            node="pve2",
+            status="running",
+            cpus=1,
+            cpu=0.1,
+            mem=512000000,
+            maxmem=1 << 30,
+            uptime=6000,
+        ),
     ]
-    return [ClusterHealth(cluster_id="c1", cluster_name="lab", online=True, nodes=[n1, n2], vms=vms, containers=cts)]
+    return [
+        ClusterHealth(
+            cluster_id="c1",
+            cluster_name="lab",
+            online=True,
+            nodes=[n1, n2],
+            vms=vms,
+            containers=cts,
+        )
+    ]
 
 
 @pytest.fixture
@@ -60,10 +133,13 @@ def _card_names(dash: Dashboard, key: str) -> list[str]:
         w = lay.itemAt(i).widget()
         if w is not None and w.objectName() == "card":
             # title label has objectName cardTitle
-            for lbl in w.findChildren(type(dash._panes[key].findChild(type(w.findChild(w.__class__, "cardHead"))))):
+            for lbl in w.findChildren(
+                type(dash._panes[key].findChild(type(w.findChild(w.__class__, "cardHead"))))
+            ):
                 pass
             # simpler: search QLabel with objectName cardTitle
             from PySide6.QtWidgets import QLabel
+
             for lbl in w.findChildren(QLabel):
                 if lbl.objectName() == "cardTitle":
                     names.append(lbl.text())
@@ -80,7 +156,11 @@ def test_filters_exist(dash, qapp):
     assert CTS in dash._sort_combo
     # node filter for NODES/storage also
     assert NODES in dash._node_filter
-    for cb in list(dash._type_filter.values()) + list(dash._node_filter.values()) + list(dash._sort_combo.values()):
+    for cb in (
+        list(dash._type_filter.values())
+        + list(dash._node_filter.values())
+        + list(dash._sort_combo.values())
+    ):
         assert isinstance(cb, QComboBox)
 
 

@@ -11,7 +11,9 @@ from proxmox_widget.config.models import ClusterHealth, LxcContainer, ProxmoxNod
 from proxmox_widget.ui.dashboard import VMS, Dashboard
 
 
-def _health_synthetic(vm_count: int = 200, ct_count: int = 0, cpu_jitter: float = 0.3) -> list[ClusterHealth]:
+def _health_synthetic(
+    vm_count: int = 200, ct_count: int = 0, cpu_jitter: float = 0.3
+) -> list[ClusterHealth]:
     node = ProxmoxNode(
         node="pve",
         status="online",
@@ -164,7 +166,17 @@ def test_diff_create_delete_only_added_removed(dash, qapp):
     health2 = _health_synthetic(200, 0, 0.3)
     health2[0].vms = health2[0].vms[5:]
     extra = [
-        QemuVm(vmid=400 + i, name=f"vm-extra-{i}", node="pve", status="running", cpus=2, cpu=0.5, mem=1_000_000_000, maxmem=2_000_000_000, uptime=1000)
+        QemuVm(
+            vmid=400 + i,
+            name=f"vm-extra-{i}",
+            node="pve",
+            status="running",
+            cpus=2,
+            cpu=0.5,
+            mem=1_000_000_000,
+            maxmem=2_000_000_000,
+            uptime=1000,
+        )
         for i in range(5)
     ]
     health2[0].vms.extend(extra)
@@ -228,7 +240,9 @@ def test_p95_under_16ms_synthetic_200(dash, qapp):
     import sys
 
     threshold = 16 if sys.platform != "win32" else 32
-    assert p95 < threshold, f"p95 {p95:.2f}ms exceeds {threshold}ms, timings {timings[:5]} .. {timings[-5:]}"
+    assert p95 < threshold, (
+        f"p95 {p95:.2f}ms exceeds {threshold}ms, timings {timings[:5]} .. {timings[-5:]}"
+    )
 
 
 def test_matches_query_unchanged(dash, qapp):

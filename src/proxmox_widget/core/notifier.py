@@ -80,12 +80,16 @@ class Notifier(QObject):
             if was_online and not h.online:
                 ckey = f"{h.cluster_id}:cluster:offline"
                 if not self._is_cooldown(ckey):
-                    cluster_events.append((f"{h.cluster_name} offline", h.error or "Cluster unreachable"))
+                    cluster_events.append(
+                        (f"{h.cluster_name} offline", h.error or "Cluster unreachable")
+                    )
                     self._mark_cooldown(ckey)
             elif not was_online and h.online:
                 ckey = f"{h.cluster_id}:cluster:online"
                 if not self._is_cooldown(ckey):
-                    cluster_events.append((f"{h.cluster_name} back online", "Cluster reachable again"))
+                    cluster_events.append(
+                        (f"{h.cluster_name} back online", "Cluster reachable again")
+                    )
                     self._mark_cooldown(ckey)
             self._prev[h.cluster_id] = h.online
 
@@ -95,14 +99,26 @@ class Notifier(QObject):
                 key = self._key(h.cluster_id, vm.vmid, False)
                 prev = self._prev_vms.get(key)
                 cur = vm.status
-                if prev and prev != cur and prev == "running" and cur == "stopped" and not self._is_cooldown(key):
+                if (
+                    prev
+                    and prev != cur
+                    and prev == "running"
+                    and cur == "stopped"
+                    and not self._is_cooldown(key)
+                ):
                     stopped.append((key, f"{vm.name} stopped", f"VM {vm.vmid} on {h.cluster_name}"))
                 self._prev_vms[key] = cur
             for ct in h.containers:
                 key = self._key(h.cluster_id, ct.vmid, True)
                 prev = self._prev_vms.get(key)
                 cur = ct.status
-                if prev and prev != cur and prev == "running" and cur == "stopped" and not self._is_cooldown(key):
+                if (
+                    prev
+                    and prev != cur
+                    and prev == "running"
+                    and cur == "stopped"
+                    and not self._is_cooldown(key)
+                ):
                     stopped.append((key, f"{ct.name} stopped", f"CT {ct.vmid} on {h.cluster_name}"))
                 self._prev_vms[key] = ct.status
 

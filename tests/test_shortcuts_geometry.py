@@ -203,7 +203,15 @@ def test_global_hotkey_optional_fallback(qapp):
         mock_hk.isRegistered.return_value = False
         mock_hk.activated = MagicMock()
         mock_hk.activated.connect = MagicMock()
-        with patch.dict("sys.modules", {"QHotkey": MagicMock(QHotkey=mock_hk.__class__, **{"QHotkey.return_value": mock_hk}), "qhotkey": MagicMock(QHotkey=mock_hk.__class__)}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "QHotkey": MagicMock(
+                    QHotkey=mock_hk.__class__, **{"QHotkey.return_value": mock_hk}
+                ),
+                "qhotkey": MagicMock(QHotkey=mock_hk.__class__),
+            },
+        ):
             # second app instance with mocked already-registered hotkey
             # Force _setup_global_hotkey to hit fallback path
             mock_cls = MagicMock(return_value=mock_hk)

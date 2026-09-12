@@ -60,9 +60,14 @@ def test_rename_with_new_secret_overwrites(monkeypatch, tmp_path):
     _cfg(tmp_path, monkeypatch)
     _mock_keyring(monkeypatch)
     s = AppSettings()
-    add_or_update_cluster(s, ClusterConfig(id="pve-old", name="old", host="10.0.0.1"), secret="oldsecret")
     add_or_update_cluster(
-        s, ClusterConfig(id="pve-new", name="new", host="10.0.0.2"), secret="newsecret", old_cluster_id="pve-old"
+        s, ClusterConfig(id="pve-old", name="old", host="10.0.0.1"), secret="oldsecret"
+    )
+    add_or_update_cluster(
+        s,
+        ClusterConfig(id="pve-new", name="new", host="10.0.0.2"),
+        secret="newsecret",
+        old_cluster_id="pve-old",
     )
     assert get_cluster_secret("pve-new") == "newsecret"
     assert get_cluster_secret("pve-old") is None
@@ -74,7 +79,12 @@ def test_rename_deletes_both_keys(monkeypatch, tmp_path):
     s = AppSettings()
     add_or_update_cluster(s, ClusterConfig(id="pve-old", name="old", host="10.0.0.1"), secret="tok")
     store[("proxmox-widget/pve-old", "token")] = "legacy-token"
-    add_or_update_cluster(s, ClusterConfig(id="pve-new", name="new", host="10.0.0.1"), secret=None, old_cluster_id="pve-old")
+    add_or_update_cluster(
+        s,
+        ClusterConfig(id="pve-new", name="new", host="10.0.0.1"),
+        secret=None,
+        old_cluster_id="pve-old",
+    )
     assert ("proxmox-widget/pve-old", "secret") not in store
     assert ("proxmox-widget/pve-old", "token") not in store
 
@@ -83,7 +93,9 @@ def test_rename_failure_does_not_crash(monkeypatch, tmp_path, caplog):
     cfg = _cfg(tmp_path, monkeypatch)
     store = _mock_keyring(monkeypatch)
     s = AppSettings()
-    add_or_update_cluster(s, ClusterConfig(id="pve-old", name="old", host="10.0.0.1"), secret="keepme")
+    add_or_update_cluster(
+        s, ClusterConfig(id="pve-old", name="old", host="10.0.0.1"), secret="keepme"
+    )
 
     def failing_set(svc, user, pw):
         raise RuntimeError("keyring down")
@@ -111,7 +123,9 @@ def test_find_orphan_and_audit(monkeypatch, tmp_path):
     _cfg(tmp_path, monkeypatch)
     _mock_keyring(monkeypatch)
     s = AppSettings(clusters=[ClusterConfig(id="keep", name="keep", host="1.1.1.1")])
-    add_or_update_cluster(s, ClusterConfig(id="orph", name="orph", host="2.2.2.2"), secret="orph-secret")
+    add_or_update_cluster(
+        s, ClusterConfig(id="orph", name="orph", host="2.2.2.2"), secret="orph-secret"
+    )
     s.clusters = [c for c in s.clusters if c.id != "orph"]
     orphans = find_orphan_cluster_ids(s)
     assert "orph" in orphans
@@ -133,6 +147,8 @@ def test_chmod_0600_on_save(monkeypatch, tmp_path):
             return None
 
     monkeypatch.setattr("proxmox_widget.config.manager.os.chmod", fake_chmod)
-    add_or_update_cluster(AppSettings(), ClusterConfig(id="ab", name="AB", host="1.1.1.1"), secret="x")
+    add_or_update_cluster(
+        AppSettings(), ClusterConfig(id="ab", name="AB", host="1.1.1.1"), secret="x"
+    )
     assert chmod_calls
     assert chmod_calls[0][1] == 0o600

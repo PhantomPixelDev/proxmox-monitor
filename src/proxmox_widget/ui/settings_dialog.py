@@ -54,7 +54,11 @@ class SettingsDialog(QDialog):
 
     def _build_remote_access_group(self) -> QGroupBox:
         c = self._current_cluster()
-        cur = c if c is not None else (self._settings.clusters[0] if self._settings.clusters else None)
+        cur = (
+            c
+            if c is not None
+            else (self._settings.clusters[0] if self._settings.clusters else None)
+        )
         box = QGroupBox("Remote access  —  per selected cluster")
         f = QFormLayout(box)
         f.setSpacing(8)
@@ -82,7 +86,9 @@ class SettingsDialog(QDialog):
         self.lbl_remote_hint.setWordWrap(True)
         f.addRow(self.lbl_remote_hint)
 
-        hint = QLabel("SSH opens in your own terminal — keys and agent work as usual; only user and port are stored.")
+        hint = QLabel(
+            "SSH opens in your own terminal — keys and agent work as usual; only user and port are stored."
+        )
         hint.setObjectName("meta")
         hint.setWordWrap(True)
         f.addRow(hint)
@@ -246,7 +252,9 @@ class SettingsDialog(QDialog):
 
         lay.addWidget(tabs, 1)
 
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
         save_btn = btns.button(QDialogButtonBox.StandardButton.Save)
         if save_btn is not None:
             save_btn.setText("Save")
@@ -287,7 +295,9 @@ class SettingsDialog(QDialog):
         self.ed_secret.setText(secret)
         self._load_remote_fields(c)
         self._update_remote_hint()
-        self.lbl_cluster_hint.setText(f"Editing {c.id} — secret from keyring" if secret else f"Editing {c.id}")
+        self.lbl_cluster_hint.setText(
+            f"Editing {c.id} — secret from keyring" if secret else f"Editing {c.id}"
+        )
         self._validate_cluster_form()
 
     def _load_remote_fields(self, c: ClusterConfig) -> None:
@@ -413,7 +423,9 @@ class SettingsDialog(QDialog):
     def _test_current_cluster(self) -> None:
         form = self._form_cluster()
         if form is None:
-            QMessageBox.warning(self, "Incomplete", "Fill in ID, host, secret and token ID before testing")
+            QMessageBox.warning(
+                self, "Incomplete", "Fill in ID, host, secret and token ID before testing"
+            )
             return
         self.btn_test.setEnabled(False)
         self.lbl_cluster_hint.setText("Testing…")
@@ -456,12 +468,16 @@ class SettingsDialog(QDialog):
         token_id = self.ed_token_id.text().strip()
         username = self.ed_user.text().strip() or "root@pam"
         if is_token and not token_id:
-            QMessageBox.warning(self, "Missing Token ID", "Token ID like root@pam!widget required for token auth")
+            QMessageBox.warning(
+                self, "Missing Token ID", "Token ID like root@pam!widget required for token auth"
+            )
             return
         if is_token and "!" not in token_id:
             self.lbl_cluster_hint.setStyleSheet("color: #f87171;")
             self.lbl_cluster_hint.setText('token_id must contain "!"')
-            QMessageBox.warning(self, "Invalid Token ID", 'token_id must contain "!" (e.g. user@realm!token)')
+            QMessageBox.warning(
+                self, "Invalid Token ID", 'token_id must contain "!" (e.g. user@realm!token)'
+            )
             return
         try:
             cfg = ClusterConfig(

@@ -12,6 +12,7 @@ from proxmox_widget.ui.settings_dialog import SettingsDialog, _parse_host_port
 @pytest.fixture
 def qapp():
     from PySide6.QtWidgets import QApplication
+
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
@@ -27,9 +28,12 @@ def _make_dialog(qapp, settings=None, monkeypatch=None):
     if settings is None:
         settings = _make_settings()
     if monkeypatch is not None:
-        monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+        monkeypatch.setattr(
+            "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+        )
     else:
         import proxmox_widget.ui.settings_dialog as sd
+
         orig = sd.get_cluster_secret
         sd.get_cluster_secret = lambda _id: "secret"
     dlg = SettingsDialog(settings)
@@ -39,15 +43,30 @@ def _make_dialog(qapp, settings=None, monkeypatch=None):
 
 
 def test_ed_attrs_not_renamed(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = SettingsDialog(_make_settings())
-    for attr in ["ed_id", "ed_host", "ed_name", "ed_token_id", "ed_user", "ed_secret", "chk_verify", "btn_save_cluster", "btn_test", "lbl_cluster_hint"]:
+    for attr in [
+        "ed_id",
+        "ed_host",
+        "ed_name",
+        "ed_token_id",
+        "ed_user",
+        "ed_secret",
+        "chk_verify",
+        "btn_save_cluster",
+        "btn_test",
+        "lbl_cluster_hint",
+    ]:
         assert hasattr(dlg, attr), f"missing {attr}"
     dlg.close()
 
 
 def test_id_validation_shows_inline_and_disables_save(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("Bad ID")
     qapp.processEvents()
@@ -61,7 +80,9 @@ def test_id_validation_shows_inline_and_disables_save(qapp, monkeypatch):
 
 
 def test_id_too_short_disables(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("a")
     qapp.processEvents()
@@ -70,13 +91,18 @@ def test_id_too_short_disables(qapp, monkeypatch):
 
 
 def test_host_validation_rejects_slash_and_disables_save(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("ab")
     dlg.ed_host.setText("evil.com/foo")
     qapp.processEvents()
     assert not dlg.btn_save_cluster.isEnabled()
-    assert "host" in dlg.lbl_cluster_hint.text().lower() or "invalid" in dlg.lbl_cluster_hint.text().lower()
+    assert (
+        "host" in dlg.lbl_cluster_hint.text().lower()
+        or "invalid" in dlg.lbl_cluster_hint.text().lower()
+    )
     dlg.ed_host.setText("10.0.0.2")
     qapp.processEvents()
     assert dlg.btn_save_cluster.isEnabled()
@@ -84,7 +110,9 @@ def test_host_validation_rejects_slash_and_disables_save(qapp, monkeypatch):
 
 
 def test_host_with_scheme_and_port_parsed(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("ab")
     dlg.ed_host.setText("https://10.0.0.9:8007/")
@@ -104,7 +132,9 @@ def test_host_with_scheme_and_port_parsed(qapp, monkeypatch):
 
 
 def test_form_cluster_rejects_token_without_bang(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("ab")
     dlg.ed_host.setText("10.0.0.1")
@@ -120,7 +150,9 @@ def test_form_cluster_rejects_token_without_bang(qapp, monkeypatch):
 
 
 def test_form_cluster_rejects_invalid_host_slash(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("ab")
     dlg.ed_host.setText("10.0.0.1/24")
@@ -132,14 +164,20 @@ def test_form_cluster_rejects_invalid_host_slash(qapp, monkeypatch):
 
 
 def test_verify_tls_tooltip(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
-    assert dlg.chk_verify.toolTip() == "Disable only for self-signed — add CA to trust store otherwise"
+    assert (
+        dlg.chk_verify.toolTip() == "Disable only for self-signed — add CA to trust store otherwise"
+    )
     dlg.close()
 
 
 def test_test_button_respects_host_parsing_and_host_validator(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     dlg.ed_id.setText("ab")
     dlg.ed_host.setText("evil.com/foo")
@@ -150,7 +188,9 @@ def test_test_button_respects_host_parsing_and_host_validator(qapp, monkeypatch)
     emitted = []
     dlg.test_requested.connect(lambda cfg, sec: emitted.append((cfg, sec)))
     # patch QMessageBox to avoid blocking
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None
+    )
     dlg._test_current_cluster()
     qapp.processEvents()
     assert emitted == []
@@ -166,7 +206,9 @@ def test_test_button_respects_host_parsing_and_host_validator(qapp, monkeypatch)
 
 
 def test_save_cluster_calls_add_or_update_and_refresh_but_not_general_prefs(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     saved = {}
 
     def fake_add(settings, cluster, secret, old_id=None):
@@ -181,9 +223,11 @@ def test_save_cluster_calls_add_or_update_and_refresh_but_not_general_prefs(qapp
         return settings
 
     monkeypatch.setattr("proxmox_widget.ui.settings_dialog.add_or_update_cluster", fake_add)
+
     # ensure save_settings not called by Save cluster
     def fake_save(settings):
         saved["save_called"] = True
+
     monkeypatch.setattr("proxmox_widget.config.manager.save_settings", fake_save)
     # also need to patch the import inside dialog's _on_save_all lazy import
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
@@ -208,9 +252,13 @@ def test_save_cluster_calls_add_or_update_and_refresh_but_not_general_prefs(qapp
     # save_settings not called yet beyond fake (which we track). Clear flag.
     saved.pop("save_called", None)
     # Now _on_save_all should persist general prefs + remote fields
-    monkeypatch.setattr("proxmox_widget.config.manager.save_settings", lambda s: saved.update({"save_called": True, "saved_settings": s}))
+    monkeypatch.setattr(
+        "proxmox_widget.config.manager.save_settings",
+        lambda s: saved.update({"save_called": True, "saved_settings": s}),
+    )
     # patch the local import inside _on_save_all by patching sd.save_settings reference via manager
     import proxmox_widget.config.manager as mgr
+
     orig_save = mgr.save_settings
     mgr.save_settings = lambda s: saved.update({"save_called": True, "saved_settings": s})
     dlg._on_save_all()
@@ -224,7 +272,9 @@ def test_save_cluster_calls_add_or_update_and_refresh_but_not_general_prefs(qapp
 
 
 def test_cancel_does_not_duplicate_and_stage_only_save_persists(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     # Track saves
     saves = []
 
@@ -236,6 +286,7 @@ def test_cancel_does_not_duplicate_and_stage_only_save_persists(qapp, monkeypatc
     # With current manager, Save cluster calls save_settings; we verify Cancel after Save cluster would have persisted
     # Here we just verify that Save cluster alone adds to dialog's settings and refreshes list
     import proxmox_widget.ui.settings_dialog as sd
+
     orig_add = sd.add_or_update_cluster
     calls = []
 
@@ -277,7 +328,9 @@ def test_cancel_does_not_duplicate_and_stage_only_save_persists(qapp, monkeypatc
 
 
 def test_signal_wiring_not_broken(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     dlg = _make_dialog(qapp, monkeypatch=monkeypatch)
     assert hasattr(dlg, "test_requested")
     # ensure signal still connectable
@@ -289,7 +342,9 @@ def test_signal_wiring_not_broken(qapp, monkeypatch):
     dlg.ed_token_id.setText("root@pam!widget")
     dlg.combo_auth.setCurrentIndex(0)
     qapp.processEvents()
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None
+    )
     dlg._test_current_cluster()
     qapp.processEvents()
     assert received == ["ab"]

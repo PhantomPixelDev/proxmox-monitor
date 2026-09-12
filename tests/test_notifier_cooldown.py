@@ -99,7 +99,9 @@ def test_batch_4_stopped_emits_summary_one():
     vms_run = [QemuVm(vmid=i, name=f"vm{i}", node="pve", status="running") for i in range(100, 104)]
     h1 = _make_health(vms=vms_run)
     n.check([h1])
-    vms_stop = [QemuVm(vmid=i, name=f"vm{i}", node="pve", status="stopped") for i in range(100, 104)]
+    vms_stop = [
+        QemuVm(vmid=i, name=f"vm{i}", node="pve", status="stopped") for i in range(100, 104)
+    ]
     h2 = _make_health(vms=vms_stop)
     n.check([h2])
     assert len(emitted) == 1
@@ -116,7 +118,9 @@ def test_batch_three_or_less_not_summarized():
     n.notification_requested.connect(lambda t, m: emitted.append((t, m)))
     vms_run = [QemuVm(vmid=i, name=f"vm{i}", node="pve", status="running") for i in range(100, 103)]
     n.check([_make_health(vms=vms_run)])
-    vms_stop = [QemuVm(vmid=i, name=f"vm{i}", node="pve", status="stopped") for i in range(100, 103)]
+    vms_stop = [
+        QemuVm(vmid=i, name=f"vm{i}", node="pve", status="stopped") for i in range(100, 103)
+    ]
     n.check([_make_health(vms=vms_stop)])
     assert len(emitted) == 3
 
@@ -185,7 +189,11 @@ def test_app_wires_notifier_with_settings():
     text = open("src/proxmox_widget/app.py", encoding="utf-8").read()
     assert "Notifier(self.tray_icon" in text
     # must pass settings
-    assert "Notifier(self.tray_icon, self.settings)" in text or "Notifier(self.tray_icon, settings" in text or ("self.settings" in text and "Notifier" in text)
+    assert (
+        "Notifier(self.tray_icon, self.settings)" in text
+        or "Notifier(self.tray_icon, settings" in text
+        or ("self.settings" in text and "Notifier" in text)
+    )
     assert "showMessage" in text
     assert "supportsMessages" in text
 

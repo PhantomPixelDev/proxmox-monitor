@@ -1,5 +1,4 @@
 import pathlib
-import re
 
 
 def test_pyproject_flags_enabled():
@@ -20,7 +19,7 @@ def test_app_sanitize_helper_exists_and_filters_token():
     # banner uses sanitized, not raw str(e)[:
     assert "dashboard.show_message(_sanitize_error" in text or "_sanitize_error(error" in text
     # should not have raw str(error)[:150] leaking host
-    assert "show_message(f\"Refresh failed: {str(error)" not in text
+    assert 'show_message(f"Refresh failed: {str(error)' not in text
     assert "show_message(str(error)[:170]" not in text
 
 
@@ -38,11 +37,15 @@ def test_no_token_secret_in_logger():
         content = p.read_text(encoding="utf-8", errors="ignore")
         for i, line in enumerate(content.splitlines(), 1):
             low = line.lower()
-            if ("token" in low or "secret" in low) and ("logger" in low or "loguru" in low or " logger" in low):
+            if ("token" in low or "secret" in low) and (
+                "logger" in low or "loguru" in low or " logger" in low
+            ):
                 # allow token_id mentions in comments but not logging secret variable
                 if "secret" in low and "logger" in low:
                     # check if line logs _secret or token variable directly
-                    assert "_secret" not in line and "PVEAPIToken" not in line, f"{p}:{i} leaks secret {line.strip()}"
+                    assert "_secret" not in line and "PVEAPIToken" not in line, (
+                        f"{p}:{i} leaks secret {line.strip()}"
+                    )
                 if "PVEAPIToken" in line:
                     raise AssertionError(f"{p}:{i} leaks token in log {line.strip()}")
 
@@ -60,14 +63,16 @@ def test_app_client_type_hints_have_no_unknown_ignore():
 def test_no_sqlite3():
     src = pathlib.Path("src")
     for p in src.rglob("*.py"):
-        assert "sqlite3" not in p.read_text(encoding="utf-8", errors="ignore"), f"{p} contains sqlite3"
+        assert "sqlite3" not in p.read_text(encoding="utf-8", errors="ignore"), (
+            f"{p} contains sqlite3"
+        )
 
 
 def test_sanitize_function_behavior():
     import importlib.util
-    import sys
 
     spec = importlib.util.spec_from_file_location("app_mod", "src/proxmox_widget/app.py")
+
     # cannot import Qt without offscreen; test logic directly
     def _sanitize_error(err, limit=150):
         raw = str(err) if err is not None else "Unknown error"

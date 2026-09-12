@@ -101,16 +101,17 @@ def _fetch_fingerprint(host: str, port: int) -> str:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    with socket.create_connection((host, port), timeout=5) as sock, ctx.wrap_socket(
-        sock, server_hostname=host
-    ) as ssock:
-            der = ssock.getpeercert(binary_form=True)
-            if der is None:
-                raise RuntimeError("no certificate returned")
-            if isinstance(der, bytes):
-                return hashlib.sha256(der).hexdigest()
-            # fallback: der is dict when binary_form False — shouldn't happen
-            raise RuntimeError("unexpected cert form")
+    with (
+        socket.create_connection((host, port), timeout=5) as sock,
+        ctx.wrap_socket(sock, server_hostname=host) as ssock,
+    ):
+        der = ssock.getpeercert(binary_form=True)
+        if der is None:
+            raise RuntimeError("no certificate returned")
+        if isinstance(der, bytes):
+            return hashlib.sha256(der).hexdigest()
+        # fallback: der is dict when binary_form False — shouldn't happen
+        raise RuntimeError("unexpected cert form")
 
 
 def _is_virtual_iface(name: str) -> bool:
@@ -159,7 +160,9 @@ class ProxmoxClient:
         try:
             fp = await asyncio.to_thread(_fetch_fingerprint, self.cluster.host, self.cluster.port)
         except Exception as e:
-            logger.warning("TOFU fingerprint fetch failed for {}: {}", self.cluster.id, _sanitize_error(e, 150))
+            logger.warning(
+                "TOFU fingerprint fetch failed for {}: {}", self.cluster.id, _sanitize_error(e, 150)
+            )
             return
         trust = _load_trust()
         stored = trust.get(self.cluster.id)
@@ -379,9 +382,13 @@ class ProxmoxClient:
     async def fetch_nodes(self) -> list[ProxmoxNode]:
         raw_any: Any = await self._get("/nodes")
         nodes: list[ProxmoxNode] = []
-        items: list[Any] = cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        items: list[Any] = (
+            cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        )
         for item_any in items:
-            item: dict[str, Any] = cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            item: dict[str, Any] = (
+                cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            )
             try:
                 nodes.append(
                     ProxmoxNode(
@@ -403,9 +410,13 @@ class ProxmoxClient:
     async def fetch_qemu(self, node: str) -> list[QemuVm]:
         raw_any: Any = await self._get(f"/nodes/{node}/qemu")
         vms: list[QemuVm] = []
-        items: list[Any] = cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        items: list[Any] = (
+            cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        )
         for item_any in items:
-            item: dict[str, Any] = cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            item: dict[str, Any] = (
+                cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            )
             try:
                 vms.append(
                     QemuVm(
@@ -430,9 +441,13 @@ class ProxmoxClient:
     async def fetch_lxc(self, node: str) -> list[LxcContainer]:
         raw_any: Any = await self._get(f"/nodes/{node}/lxc")
         out: list[LxcContainer] = []
-        items: list[Any] = cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        items: list[Any] = (
+            cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        )
         for item_any in items:
-            item: dict[str, Any] = cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            item: dict[str, Any] = (
+                cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            )
             try:
                 out.append(
                     LxcContainer(
@@ -456,9 +471,13 @@ class ProxmoxClient:
     async def fetch_storage(self, node: str) -> list[StorageStatus]:
         raw_any: Any = await self._get(f"/nodes/{node}/storage")
         out: list[StorageStatus] = []
-        items: list[Any] = cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        items: list[Any] = (
+            cast(list[Any], raw_any) if isinstance(raw_any, list) else cast(list[Any], [])
+        )
         for item_any in items:
-            item: dict[str, Any] = cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            item: dict[str, Any] = (
+                cast(dict[str, Any], item_any) if isinstance(item_any, dict) else {}
+            )
             try:
                 out.append(
                     StorageStatus(
@@ -509,7 +528,9 @@ class ProxmoxClient:
                     try:
                         cts = await self.fetch_lxc(n.node)
                     except Exception as e2:
-                        logger.warning("node {} lxc retry failed: {}", n.node, _sanitize_error(e2, 150))
+                        logger.warning(
+                            "node {} lxc retry failed: {}", n.node, _sanitize_error(e2, 150)
+                        )
                 else:
                     logger.warning("node {} lxc failed: {}", n.node, _sanitize_error(e, 150))
             try:
@@ -667,7 +688,9 @@ class ProxmoxClient:
 
     async def agent_ips(self, node: str, vmid: int) -> list[str]:
         try:
-            data_any: Any = await self._get(f"/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces")
+            data_any: Any = await self._get(
+                f"/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces"
+            )
         except Exception as e:
             msg = str(e)
             if "No QEMU guest agent configured" in msg:
@@ -703,7 +726,9 @@ class ProxmoxClient:
             if _is_virtual_iface(name):
                 continue
             addrs_any: Any = iface.get("ip-addresses") or []
-            addrs_list: list[Any] = cast(list[Any], addrs_any) if isinstance(addrs_any, list) else []
+            addrs_list: list[Any] = (
+                cast(list[Any], addrs_any) if isinstance(addrs_any, list) else []
+            )
             for addr_any in addrs_list:
                 if not isinstance(addr_any, dict):
                     continue
@@ -755,7 +780,9 @@ class ProxmoxClient:
                 return data_any3
             return str(data_any3)
         except Exception as e:
-            raise ActionFailedError(f"action {action} failed for {vmid} on {node}: {_sanitize_error(e, 120)}") from e
+            raise ActionFailedError(
+                f"action {action} failed for {vmid} on {node}: {_sanitize_error(e, 120)}"
+            ) from e
 
     async def get_guest_status(self, node: str, vmid: int, is_lxc: bool = False) -> str:
         kind = "lxc" if is_lxc else "qemu"
@@ -799,7 +826,9 @@ class ProxmoxClient:
         """
         key: tuple[str, int, str] = (node, vmid, timeframe)
         try:
-            raw_any6: Any = await self._get(f"/nodes/{node}/qemu/{vmid}/rrddata?timeframe={timeframe}")
+            raw_any6: Any = await self._get(
+                f"/nodes/{node}/qemu/{vmid}/rrddata?timeframe={timeframe}"
+            )
         except Exception:
             return self._rrd_cache.get(key, [])
         if not isinstance(raw_any6, list):

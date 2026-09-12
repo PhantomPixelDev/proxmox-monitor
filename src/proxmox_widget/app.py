@@ -173,7 +173,9 @@ class ProxmoxWidgetApp(QObject):
     def _on_notify(self, title: str, msg: str) -> None:
         try:
             if self.tray_icon.supportsMessages():
-                self.tray_icon.showMessage(title, msg, QSystemTrayIcon.MessageIcon.Information, 3000)
+                self.tray_icon.showMessage(
+                    title, msg, QSystemTrayIcon.MessageIcon.Information, 3000
+                )
             else:
                 raise RuntimeError("no native support")
         except Exception:
@@ -377,7 +379,10 @@ class ProxmoxWidgetApp(QObject):
             except Exception as e:
                 logger.warning("cluster {} failed: {}", c.id, _sanitize_error(e, 150))
                 return ClusterHealth(
-                    cluster_id=c.id, cluster_name=c.name, online=False, error=_sanitize_error(e, 150)
+                    cluster_id=c.id,
+                    cluster_name=c.name,
+                    online=False,
+                    error=_sanitize_error(e, 150),
                 )
 
         return list(await asyncio.gather(*(one(c) for c in clusters)))
@@ -386,7 +391,9 @@ class ProxmoxWidgetApp(QObject):
         self._refreshing = False
         from typing import cast
 
-        health: list[ClusterHealth] = cast(list[ClusterHealth], results) if isinstance(results, list) else []
+        health: list[ClusterHealth] = (
+            cast(list[ClusterHealth], results) if isinstance(results, list) else []
+        )
         self._health = health
         self.dashboard.update_health(health)
         self.tray.update_from_health(health)
@@ -632,11 +639,15 @@ class ProxmoxWidgetApp(QObject):
                     except Exception as exc:
                         name = type(exc).__name__
                         failures[name] = failures.get(name, 0) + 1
-                        logger.warning("bulk {} {} failed: {}", action, vmid, _sanitize_error(exc, 150))
+                        logger.warning(
+                            "bulk {} {} failed: {}", action, vmid, _sanitize_error(exc, 150)
+                        )
                     else:
                         successes += 1
 
-            await asyncio.gather(*[_one(cid, node, vmid, is_lxc) for cid, node, vmid, is_lxc in items])
+            await asyncio.gather(
+                *[_one(cid, node, vmid, is_lxc) for cid, node, vmid, is_lxc in items]
+            )
             total = len(items)
             banner = f"{successes}/{total} succeeded"
             if failures:
@@ -647,7 +658,11 @@ class ProxmoxWidgetApp(QObject):
         def _finish_bulk(text: str) -> None:
             for cid, _node, vmid, is_lxc in items:
                 self.dashboard.set_busy(cid, vmid, is_lxc, None)
-            kind = "success" if text.startswith(f"{len(items)}/{len(items)}") else ("warning" if "succeeded" in text and not text.startswith("0/") else "error")
+            kind = (
+                "success"
+                if text.startswith(f"{len(items)}/{len(items)}")
+                else ("warning" if "succeeded" in text and not text.startswith("0/") else "error")
+            )
             self.dashboard.show_message(text, kind, 5000)
             self.refresh_now()
 

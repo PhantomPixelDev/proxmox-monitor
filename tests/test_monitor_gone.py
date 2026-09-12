@@ -17,7 +17,9 @@ def _qapp():
 
 
 def test_monitor_file_deleted():
-    assert not pathlib.Path("src/proxmox_widget/core/monitor.py").exists(), "monitor.py should be deleted"
+    assert not pathlib.Path("src/proxmox_widget/core/monitor.py").exists(), (
+        "monitor.py should be deleted"
+    )
 
 
 def test_no_monitor_import_in_src():
@@ -27,7 +29,11 @@ def test_no_monitor_import_in_src():
             text = p.read_text(encoding="utf-8")
         except Exception:
             continue
-        if "from proxmox_widget.core.monitor import" in text or "from .monitor import" in text or "from proxmox_widget.core import Monitor" in text:
+        if (
+            "from proxmox_widget.core.monitor import" in text
+            or "from .monitor import" in text
+            or "from proxmox_widget.core import Monitor" in text
+        ):
             hits.append(str(p))
     assert hits == [], f"monitor imports remain: {hits}"
     # core __init__ should not export Monitor
@@ -39,6 +45,7 @@ def test_no_monitor_import_in_src():
 def test_grep_from_monitor_import_returns_zero():
     # mirrors: grep -r "from.*monitor import" src → 0
     import re
+
     pat = re.compile(r"from.*monitor\s+import")
     matches = []
     for p in pathlib.Path("src").rglob("*.py"):
@@ -71,48 +78,51 @@ def test_app_refresh_without_monitor():
     fake_settings.start_minimized = True
     fake_settings.notifications_enabled = False
 
-    fake_health = ClusterHealth(cluster_id="c1", cluster_name="lab", online=True, vms=[], containers=[])
+    fake_health = ClusterHealth(
+        cluster_id="c1", cluster_name="lab", online=True, vms=[], containers=[]
+    )
 
-    with patch("proxmox_widget.app.load_settings", return_value=fake_settings), patch(
-        "proxmox_widget.app.ProxmoxClient"
-    ) as MockClient:
-            mock_inst = AsyncMock()
-            mock_inst.fetch_health = AsyncMock(return_value=fake_health)
-            mock_inst.__aenter__ = AsyncMock(return_value=mock_inst)
-            mock_inst.__aexit__ = AsyncMock(return_value=False)
-            MockClient.return_value = mock_inst
+    with (
+        patch("proxmox_widget.app.load_settings", return_value=fake_settings),
+        patch("proxmox_widget.app.ProxmoxClient") as MockClient,
+    ):
+        mock_inst = AsyncMock()
+        mock_inst.fetch_health = AsyncMock(return_value=fake_health)
+        mock_inst.__aenter__ = AsyncMock(return_value=mock_inst)
+        mock_inst.__aexit__ = AsyncMock(return_value=False)
+        MockClient.return_value = mock_inst
 
-            from proxmox_widget.app import ProxmoxWidgetApp
+        from proxmox_widget.app import ProxmoxWidgetApp
 
-            app = QApplication.instance() or QApplication([])
-            w = ProxmoxWidgetApp(app)
+        app = QApplication.instance() or QApplication([])
+        w = ProxmoxWidgetApp(app)
 
-            # _fetch_all should query via ProxmoxClient, not Monitor
-            result = asyncio.run(w._fetch_all())
-            assert isinstance(result, list)
-            assert len(result) == 1
-            assert result[0].cluster_id == "c1"
-            assert result[0].online is True
+        # _fetch_all should query via ProxmoxClient, not Monitor
+        result = asyncio.run(w._fetch_all())
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].cluster_id == "c1"
+        assert result[0].online is True
 
-            # refresh_now delegates to _fetch_all via runner
-            w._fetch_all = AsyncMock(return_value=[fake_health])  # type: ignore[method-assign]
-            called = []
+        # refresh_now delegates to _fetch_all via runner
+        w._fetch_all = AsyncMock(return_value=[fake_health])  # type: ignore[method-assign]
+        called = []
 
-            orig_spawn = w._spawn
+        orig_spawn = w._spawn
 
-            def capture_spawn(factory, on_done=None, on_error=None):
-                called.append(factory)
-                # verify factory is w._fetch_all
-                assert factory is w._fetch_all
+        def capture_spawn(factory, on_done=None, on_error=None):
+            called.append(factory)
+            # verify factory is w._fetch_all
+            assert factory is w._fetch_all
 
-            w._spawn = capture_spawn  # type: ignore[method-assign]
-            w._refreshing = False
-            w.refresh_now()
-            assert len(called) == 1
+        w._spawn = capture_spawn  # type: ignore[method-assign]
+        w._refreshing = False
+        w.refresh_now()
+        assert len(called) == 1
 
-            # second refresh while refreshing should be skipped (single source guard)
-            w._refreshing = True
-            w.refresh_now()
-            assert len(called) == 1  # not called again
+        # second refresh while refreshing should be skipped (single source guard)
+        w._refreshing = True
+        w.refresh_now()
+        assert len(called) == 1  # not called again
 
-            w._runner.stop()
+        w._runner.stop()

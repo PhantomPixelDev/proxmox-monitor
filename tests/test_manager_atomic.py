@@ -107,9 +107,12 @@ def test_save_and_load_use_filelock(monkeypatch, tmp_path):
         assert MockLock.called, "FileLock not used in save_settings"
         lock_path, kwargs = MockLock.call_args[0][0], MockLock.call_args[1]
         assert ".lock" in str(lock_path), f"lock path should contain .lock, got {lock_path}"
-        assert kwargs.get("timeout") == 2 or MockLock.call_args[1].get("timeout") == 2 or any(
-            "timeout" in str(c) for c in MockLock.call_args
-        ) or MockLock.call_args.kwargs.get("timeout") == 2
+        assert (
+            kwargs.get("timeout") == 2
+            or MockLock.call_args[1].get("timeout") == 2
+            or any("timeout" in str(c) for c in MockLock.call_args)
+            or MockLock.call_args.kwargs.get("timeout") == 2
+        )
 
     with patch("proxmox_widget.config.manager.FileLock") as MockLock:
         mock_instance = MagicMock()
@@ -134,7 +137,9 @@ def test_keyring_prefix_unchanged():
 def test_save_never_persists_secrets(monkeypatch, tmp_path):
     cfg = tmp_path / "config.json"
     monkeypatch.setattr("proxmox_widget.config.manager._config_path", lambda: cfg)
-    s = AppSettings(clusters=[ClusterConfig(id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t")])
+    s = AppSettings(
+        clusters=[ClusterConfig(id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t")]
+    )
     save_settings(s)
     data = json.loads(cfg.read_text(encoding="utf-8"))
     dumped = json.dumps(data)

@@ -52,15 +52,22 @@ def test_popen_guard_raises_action_failed():
                 with pytest.raises(ActionFailedError):
                     launcher.open_rdp_file(Path("/tmp/foo.rdp"))
             with patch("proxmox_widget.core.launcher._which", return_value="/usr/bin/ssh"):
-                with patch("proxmox_widget.core.launcher.terminal_command", return_value=["ssh", "-tt", "root@host"]):
+                with patch(
+                    "proxmox_widget.core.launcher.terminal_command",
+                    return_value=["ssh", "-tt", "root@host"],
+                ):
                     with pytest.raises(ActionFailedError):
                         launcher.open_ssh("host")
-        with patch("proxmox_widget.core.launcher.rdp_command", return_value=["mstsc", "/v:host:3389"]):
+        with patch(
+            "proxmox_widget.core.launcher.rdp_command", return_value=["mstsc", "/v:host:3389"]
+        ):
             with pytest.raises(ActionFailedError):
                 launcher.open_rdp("host")
         # open_spice
         with patch("proxmox_widget.core.launcher._which", return_value="/usr/bin/remote-viewer"):
-            with patch("proxmox_widget.core.launcher.write_spice_file", return_value=Path("/tmp/spice.vv")):
+            with patch(
+                "proxmox_widget.core.launcher.write_spice_file", return_value=Path("/tmp/spice.vv")
+            ):
                 with pytest.raises(ActionFailedError):
                     launcher.open_spice("content", 100)
 
@@ -68,7 +75,9 @@ def test_popen_guard_raises_action_failed():
 def test_which_cache_dict():
     assert isinstance(_which_cache, dict)
     _which_cache.clear()
-    with patch("proxmox_widget.core.launcher.shutil.which", return_value="/usr/bin/ssh") as mock_which:
+    with patch(
+        "proxmox_widget.core.launcher.shutil.which", return_value="/usr/bin/ssh"
+    ) as mock_which:
         assert launcher._which("ssh") == "/usr/bin/ssh"
         assert launcher._which("ssh") == "/usr/bin/ssh"
         mock_which.assert_called_once()

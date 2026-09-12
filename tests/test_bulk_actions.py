@@ -52,9 +52,27 @@ def dash(qapp):
 
 
 def _health(n=5, cid="c1"):
-    node = ProxmoxNode(node="pve", status="online", cpu=0.2, maxcpu=4, mem=4_000_000_000, maxmem=16_000_000_000)
-    vms = [QemuVm(vmid=100 + i, name=f"vm-{i}", node="pve", status="running", cpus=2, cpu=0.5, mem=1_000_000_000, maxmem=2_000_000_000) for i in range(n)]
-    return [ClusterHealth(cluster_id=cid, cluster_name="lab", online=True, nodes=[node], vms=vms, containers=[])]
+    node = ProxmoxNode(
+        node="pve", status="online", cpu=0.2, maxcpu=4, mem=4_000_000_000, maxmem=16_000_000_000
+    )
+    vms = [
+        QemuVm(
+            vmid=100 + i,
+            name=f"vm-{i}",
+            node="pve",
+            status="running",
+            cpus=2,
+            cpu=0.5,
+            mem=1_000_000_000,
+            maxmem=2_000_000_000,
+        )
+        for i in range(n)
+    ]
+    return [
+        ClusterHealth(
+            cluster_id=cid, cluster_name="lab", online=True, nodes=[node], vms=vms, containers=[]
+        )
+    ]
 
 
 def test_bulk_toolbar_exists(dash, qapp):
@@ -101,7 +119,9 @@ def test_bulk_concurrency_le3(qapp, dash):
 
     orig_load = mgr.load_settings
     try:
-        mgr.load_settings = lambda: AppSettings(clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)])
+        mgr.load_settings = lambda: AppSettings(
+            clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)]
+        )
         from proxmox_widget.app import ProxmoxWidgetApp
 
         app = QApplication.instance() or QApplication([])
@@ -177,7 +197,9 @@ def test_bulk_aggregate_3_of_5(qapp, dash):
 
     orig_load = mgr.load_settings
     try:
-        mgr.load_settings = lambda: AppSettings(clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)])
+        mgr.load_settings = lambda: AppSettings(
+            clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)]
+        )
         from proxmox_widget.app import ProxmoxWidgetApp
 
         app = QApplication.instance() or QApplication([])
@@ -245,7 +267,9 @@ def test_bulk_privilege_gate_blocks(qapp, dash):
 
     orig_load = mgr.load_settings
     try:
-        mgr.load_settings = lambda: AppSettings(clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)])
+        mgr.load_settings = lambda: AppSettings(
+            clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)]
+        )
         from proxmox_widget.app import ProxmoxWidgetApp
 
         app = QApplication.instance() or QApplication([])
@@ -302,7 +326,9 @@ def test_bulk_migrate_snapshot_blocked(qapp, dash):
 
     orig_load = mgr.load_settings
     try:
-        mgr.load_settings = lambda: AppSettings(clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)])
+        mgr.load_settings = lambda: AppSettings(
+            clusters=[ClusterConfig(id="c1", name="lab", host="pve.example.com", port=8006)]
+        )
         from proxmox_widget.app import ProxmoxWidgetApp
 
         app = QApplication.instance() or QApplication([])
@@ -322,7 +348,9 @@ def test_bulk_migrate_snapshot_blocked(qapp, dash):
         banners = []
         dash.show_message = lambda t, k="info", d=4000: banners.append((t, k))
 
-        w._spawn = lambda f, on_done=None, on_error=None: (_ for _ in ()).throw(AssertionError("should not spawn for blocked action"))
+        w._spawn = lambda f, on_done=None, on_error=None: (_ for _ in ()).throw(
+            AssertionError("should not spawn for blocked action")
+        )
 
         with patch("proxmox_widget.app.ProxmoxClient.vm_action", fake_vm_action):
             w._on_bulk_action("migrate")

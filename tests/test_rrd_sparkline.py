@@ -22,7 +22,9 @@ def qapp():
 
 
 def _cluster():
-    return ClusterConfig(id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN)
+    return ClusterConfig(
+        id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN
+    )
 
 
 @pytest.mark.asyncio
@@ -142,9 +144,37 @@ def test_sparkline_draws_polyline(qapp):
 
 def test_guest_card_has_sparkline_when_running(qapp):
     dash = Dashboard()
-    vm_running = QemuVm(vmid=100, name="web", node="pve", status="running", cpus=2, cpu=0.5, mem=512, maxmem=1024, uptime=100)
-    vm_stopped = QemuVm(vmid=101, name="db", node="pve", status="stopped", cpus=2, cpu=0.0, mem=0, maxmem=1024, uptime=0)
-    health = ClusterHealth(cluster_id="pve", cluster_name="PVE", online=True, nodes=[], vms=[vm_running, vm_stopped], containers=[], storages=[])
+    vm_running = QemuVm(
+        vmid=100,
+        name="web",
+        node="pve",
+        status="running",
+        cpus=2,
+        cpu=0.5,
+        mem=512,
+        maxmem=1024,
+        uptime=100,
+    )
+    vm_stopped = QemuVm(
+        vmid=101,
+        name="db",
+        node="pve",
+        status="stopped",
+        cpus=2,
+        cpu=0.0,
+        mem=0,
+        maxmem=1024,
+        uptime=0,
+    )
+    health = ClusterHealth(
+        cluster_id="pve",
+        cluster_name="PVE",
+        online=True,
+        nodes=[],
+        vms=[vm_running, vm_stopped],
+        containers=[],
+        storages=[],
+    )
     dash.update_health([health])
     qapp.processEvents()
     vms_pane = dash._panes["vms"]

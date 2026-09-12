@@ -48,7 +48,9 @@ def load_settings() -> AppSettings:
                 shutil.copyfile(path, bak)
             except Exception:
                 pass
-            logger.warning("Corrupt config at {}: {} — backed up to {} and using defaults", path, e, bak)
+            logger.warning(
+                "Corrupt config at {}: {} — backed up to {} and using defaults", path, e, bak
+            )
             return AppSettings()
         except Exception as e:
             logger.error("Failed to load config {}: {} — using defaults", path, e)
@@ -194,9 +196,7 @@ def get_all_cluster_ids(settings: AppSettings | None = None) -> list[str]:
             store = getattr(kr, attr, None)
             if isinstance(store, dict):
                 for svc in list(store.keys()):
-                    if isinstance(svc, str) and svc.startswith(
-                        KEYRING_SERVICE_PREFIX + "/"
-                    ):
+                    if isinstance(svc, str) and svc.startswith(KEYRING_SERVICE_PREFIX + "/"):
                         ids.add(svc[len(KEYRING_SERVICE_PREFIX) + 1 :])
                 break
             if isinstance(store, dict):

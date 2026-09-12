@@ -201,7 +201,7 @@ def test_no_string_500_check() -> None:
     src = inspect.getsource(ProxmoxClient.fetch_health)
     assert '"500" in msg' not in src
     assert "'500' in msg" not in src
-    assert 'status' in src.lower()
+    assert "status" in src.lower()
 
 
 def test_httpx_timeout_unchanged() -> None:

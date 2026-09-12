@@ -38,9 +38,27 @@ def dash(qapp):
 
 
 def _health(n=5):
-    node = ProxmoxNode(node="pve", status="online", cpu=0.2, maxcpu=4, mem=4000000000, maxmem=16000000000)
-    vms = [QemuVm(vmid=100 + i, name=f"vm-{i}", node="pve", status="running", cpus=2, cpu=0.5, mem=1000000000, maxmem=2000000000) for i in range(n)]
-    return [ClusterHealth(cluster_id="c1", cluster_name="lab", online=True, nodes=[node], vms=vms, containers=[])]
+    node = ProxmoxNode(
+        node="pve", status="online", cpu=0.2, maxcpu=4, mem=4000000000, maxmem=16000000000
+    )
+    vms = [
+        QemuVm(
+            vmid=100 + i,
+            name=f"vm-{i}",
+            node="pve",
+            status="running",
+            cpus=2,
+            cpu=0.5,
+            mem=1000000000,
+            maxmem=2000000000,
+        )
+        for i in range(n)
+    ]
+    return [
+        ClusterHealth(
+            cluster_id="c1", cluster_name="lab", online=True, nodes=[node], vms=vms, containers=[]
+        )
+    ]
 
 
 def test_window_flags_tool_not_popup(dash):
@@ -69,7 +87,9 @@ def test_show_dashboard_uses_screenAt_and_dpi(qapp):
         widget_app = ProxmoxWidgetApp(app)
         fake_screen = MagicMock()
         fake_screen.devicePixelRatio.return_value = 2.0
-        fake_screen.availableGeometry.return_value = QGuiApplication.primaryScreen().availableGeometry()
+        fake_screen.availableGeometry.return_value = (
+            QGuiApplication.primaryScreen().availableGeometry()
+        )
         with (
             patch.object(QGuiApplication, "screenAt", return_value=fake_screen) as mock_screenAt,
             patch.object(QCursor, "pos", return_value=QPoint(400, 400)),
@@ -93,7 +113,9 @@ def test_bulk_selection_ctrl_3(dash, qapp):
     qapp.processEvents()
     dash.clear_selection()
     for i in range(3):
-        dash._on_card_clicked("c1", 100 + i, False, Qt.KeyboardModifier.ControlModifier, Qt.MouseButton.LeftButton)
+        dash._on_card_clicked(
+            "c1", 100 + i, False, Qt.KeyboardModifier.ControlModifier, Qt.MouseButton.LeftButton
+        )
     assert len(dash._selected) == 3
     assert ("c1", 100, False) in dash._selected
     assert dash.is_selected("c1", 101, False)
@@ -103,8 +125,12 @@ def test_bulk_selection_shift(dash, qapp):
     dash.update_health(_health(5))
     qapp.processEvents()
     dash.clear_selection()
-    dash._on_card_clicked("c1", 100, False, Qt.KeyboardModifier.NoModifier, Qt.MouseButton.LeftButton)
-    dash._on_card_clicked("c1", 102, False, Qt.KeyboardModifier.ShiftModifier, Qt.MouseButton.LeftButton)
+    dash._on_card_clicked(
+        "c1", 100, False, Qt.KeyboardModifier.NoModifier, Qt.MouseButton.LeftButton
+    )
+    dash._on_card_clicked(
+        "c1", 102, False, Qt.KeyboardModifier.ShiftModifier, Qt.MouseButton.LeftButton
+    )
     assert len(dash._selected) == 3
     assert ("c1", 101, False) in dash._selected
 

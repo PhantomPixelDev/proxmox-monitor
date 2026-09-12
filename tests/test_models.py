@@ -30,7 +30,9 @@ def test_tls_verification_is_on_by_default():
     """A token must not cross an unverified connection unless asked."""
     from proxmox_widget.config.models import ClusterConfig
 
-    assert ClusterConfig(id="ab", name="ab", host="h", auth_mode=AuthMode.PASSWORD).verify_ssl is True
+    assert (
+        ClusterConfig(id="ab", name="ab", host="h", auth_mode=AuthMode.PASSWORD).verify_ssl is True
+    )
 
 
 def test_settings_validation_host_and_id():

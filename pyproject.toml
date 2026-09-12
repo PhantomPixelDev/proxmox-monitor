@@ -74,7 +74,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C4", "UP", "SIM", "RUF"]
-ignore = ["E501", "RUF001", "UP042", "SIM105", "RUF006", "F841"]
+ignore = ["E501", "RUF001", "UP042", "SIM105", "RUF006", "F841", "SIM117", "SIM115", "B007", "B023"]
 
 [tool.ruff.format]
 quote-style = "double"

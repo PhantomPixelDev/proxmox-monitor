@@ -81,12 +81,16 @@ def test_typing_10_chars_at_20ms_results_le2_rebuilds(dash, qapp):
         QTest.qWait(20)
         qapp.processEvents()
 
-    assert mock.call_count <= 1, f"debounce should suppress intermediate rebuilds, got {mock.call_count}"
+    assert mock.call_count <= 1, (
+        f"debounce should suppress intermediate rebuilds, got {mock.call_count}"
+    )
 
     QTest.qWait(250)
     qapp.processEvents()
 
-    assert mock.call_count <= 2, f"typing 10 chars at 20ms should result <=2 rebuilds, got {mock.call_count}"
+    assert mock.call_count <= 2, (
+        f"typing 10 chars at 20ms should result <=2 rebuilds, got {mock.call_count}"
+    )
     assert mock.call_count >= 1, "at least one debounced rebuild should fire"
 
     dash._rebuild = original
@@ -137,7 +141,9 @@ def test_running_toggle_not_debounced(dash, qapp):
 
     btn.setChecked(False)
     qapp.processEvents()
-    assert mock.call_count == 2, f"Running toggle off should rebuild immediately, got {mock.call_count}"
+    assert mock.call_count == 2, (
+        f"Running toggle off should rebuild immediately, got {mock.call_count}"
+    )
 
     dash._rebuild = original
 
@@ -149,7 +155,11 @@ def test_search_timer_cancel_prior(dash, qapp):
     QTest.qWait(200)
     qapp.processEvents()
 
-    assert hasattr(dash, "_search_timers") or hasattr(dash, "_search_debounce") or hasattr(dash, "_debounce")
+    assert (
+        hasattr(dash, "_search_timers")
+        or hasattr(dash, "_search_debounce")
+        or hasattr(dash, "_debounce")
+    )
     assert VMS in dash._search
 
     original = dash._rebuild
@@ -159,7 +169,9 @@ def test_search_timer_cancel_prior(dash, qapp):
 
     edit.setText("a")
     qapp.processEvents()
-    timer = dash._search_timers.get(VMS) or dash._search_debounce.get(VMS) or dash._debounce.get(VMS)
+    timer = (
+        dash._search_timers.get(VMS) or dash._search_debounce.get(VMS) or dash._debounce.get(VMS)
+    )
     assert timer is not None
     assert timer.isActive()
 

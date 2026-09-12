@@ -74,7 +74,9 @@ def test_manager_round_trip_platformdirs_keyring_mock(monkeypatch, tmp_path):
 
 def test_manager_config_path_mkdir(monkeypatch, tmp_path):
     base = tmp_path / "a" / "b"
-    monkeypatch.setattr("proxmox_widget.config.manager.user_config_dir", lambda *_a, **_k: str(base))
+    monkeypatch.setattr(
+        "proxmox_widget.config.manager.user_config_dir", lambda *_a, **_k: str(base)
+    )
     p = _config_path()
     assert p == base / "config.json"
     assert base.exists()
@@ -138,11 +140,13 @@ def test_manager_load_copyfile_exception(monkeypatch, tmp_path, caplog):
 def test_manager_add_or_update_rename_edge_cases(monkeypatch, tmp_path):
     _cfg(tmp_path, monkeypatch)
     _mock_keyring(monkeypatch)
-    s = AppSettings(clusters=[
-        ClusterConfig(id="aa", name="AA", host="1.1.1.1"),
-        ClusterConfig(id="bb", name="BB", host="2.2.2.2"),
-        ClusterConfig(id="cc", name="CC", host="3.3.3.3"),
-    ])
+    s = AppSettings(
+        clusters=[
+            ClusterConfig(id="aa", name="AA", host="1.1.1.1"),
+            ClusterConfig(id="bb", name="BB", host="2.2.2.2"),
+            ClusterConfig(id="cc", name="CC", host="3.3.3.3"),
+        ]
+    )
     set_cluster_secret("aa", "secret-aa")
     new = ClusterConfig(id="bb", name="BB-new", host="2.2.2.2")
     add_or_update_cluster(s, new, secret=None, old_cluster_id="aa")
@@ -153,7 +157,9 @@ def test_manager_add_or_update_rename_edge_cases(monkeypatch, tmp_path):
     _mock_keyring(monkeypatch)
     s2 = AppSettings(clusters=[ClusterConfig(id="xx", name="XX", host="1.1.1.1")])
     set_cluster_secret("oldx", "keep")
-    add_or_update_cluster(s2, ClusterConfig(id="yy", name="YY", host="1.1.1.1"), secret=None, old_cluster_id="oldx")
+    add_or_update_cluster(
+        s2, ClusterConfig(id="yy", name="YY", host="1.1.1.1"), secret=None, old_cluster_id="oldx"
+    )
     assert get_cluster_secret("yy") == "keep"
 
     s3 = AppSettings(clusters=[ClusterConfig(id="keep", name="keep", host="1.1.1.1")])
@@ -185,7 +191,10 @@ def test_manager_get_all_orphan_and_remove(monkeypatch, tmp_path):
     assert not any(c.id == "orph" for c in s.clusters)
     assert get_cluster_secret("orph") is None
 
-    monkeypatch.setattr("proxmox_widget.config.manager.keyring.get_keyring", lambda: MagicMock(_mock_store={"proxmox-widget/extra": "x"}))
+    monkeypatch.setattr(
+        "proxmox_widget.config.manager.keyring.get_keyring",
+        lambda: MagicMock(_mock_store={"proxmox-widget/extra": "x"}),
+    )
     ids2 = get_all_cluster_ids(s)
     assert "extra" in ids2 or "keep" in ids2
 
@@ -204,8 +213,14 @@ def test_format_bar():
 
 
 def test_settings_validation_helpers(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
-    dlg = SettingsDialog(AppSettings(clusters=[ClusterConfig(id="ab", name="AB", host="10.0.0.1", token_id="root@pam!t")]))
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
+    dlg = SettingsDialog(
+        AppSettings(
+            clusters=[ClusterConfig(id="ab", name="AB", host="10.0.0.1", token_id="root@pam!t")]
+        )
+    )
     dlg.show()
     qapp.processEvents()
     assert dlg._validate_id_text("ab") is None
@@ -226,9 +241,15 @@ def test_settings_validation_helpers(qapp, monkeypatch):
 
 
 def test_settings_dialog_token_bang_validation(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None)
-    s = AppSettings(clusters=[ClusterConfig(id="ab", name="AB", host="10.0.0.1", token_id="root@pam!t")])
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.QMessageBox.warning", lambda *a, **k: None
+    )
+    s = AppSettings(
+        clusters=[ClusterConfig(id="ab", name="AB", host="10.0.0.1", token_id="root@pam!t")]
+    )
     dlg = SettingsDialog(s)
     dlg.show()
     qapp.processEvents()
@@ -248,7 +269,9 @@ def test_settings_dialog_token_bang_validation(qapp, monkeypatch):
 async def test_actions_wait_until(monkeypatch):
     from proxmox_widget.config.models import ClusterConfig
 
-    cfg = ClusterConfig(id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN)
+    cfg = ClusterConfig(
+        id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN
+    )
 
     called = {}
 
@@ -277,7 +300,9 @@ async def test_actions_wait_until(monkeypatch):
 def test_actions_wait_until_sync(monkeypatch):
     from proxmox_widget.config.models import ClusterConfig
 
-    cfg = ClusterConfig(id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN)
+    cfg = ClusterConfig(
+        id="pve", name="PVE", host="1.2.3.4", token_id="root@pam!t", auth_mode=AuthMode.TOKEN
+    )
 
     class FakeClient:
         def __init__(self, cluster):
@@ -316,17 +341,36 @@ async def test_actions_wait_until_timeout(monkeypatch):
 
 
 def test_dashboard_offline_banner(qapp, monkeypatch):
-    monkeypatch.setattr("proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret")
+    monkeypatch.setattr(
+        "proxmox_widget.ui.settings_dialog.get_cluster_secret", lambda _id: "secret"
+    )
     d = Dashboard()
     d.show()
     qapp.processEvents()
 
-    healthy = ClusterHealth(cluster_id="pve", cluster_name="PVE", online=True, nodes=[], vms=[], containers=[], storages=[])
+    healthy = ClusterHealth(
+        cluster_id="pve",
+        cluster_name="PVE",
+        online=True,
+        nodes=[],
+        vms=[],
+        containers=[],
+        storages=[],
+    )
     d.update_health([healthy])
     qapp.processEvents()
     assert d._banner.isVisible() is False or "Offline" not in d._banner_label.text()
 
-    offline = ClusterHealth(cluster_id="pve", cluster_name="PVE", online=False, error="timeout", nodes=[], vms=[], containers=[], storages=[])
+    offline = ClusterHealth(
+        cluster_id="pve",
+        cluster_name="PVE",
+        online=False,
+        error="timeout",
+        nodes=[],
+        vms=[],
+        containers=[],
+        storages=[],
+    )
     d.update_health([offline])
     qapp.processEvents()
     assert d._banner.isVisible() is True

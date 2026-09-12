@@ -27,7 +27,9 @@ def _health():
     ]
     h1 = ClusterHealth(cluster_id="c1", cluster_name="lab1", online=True, vms=vms, containers=cts)
     # offline cluster
-    h2 = ClusterHealth(cluster_id="c2", cluster_name="lab2", online=False, error="timeout", vms=[], containers=[])
+    h2 = ClusterHealth(
+        cluster_id="c2", cluster_name="lab2", online=False, error="timeout", vms=[], containers=[]
+    )
     return [h1, h2]
 
 
@@ -106,7 +108,7 @@ def test_offline_dot_disabled_entry():
     assert not a.isEnabled()
     assert "timeout" in a.toolTip()
     # online one enabled
-    online = [x for x in actions if "lab1" in x.text()][0]
+    online = next(x for x in actions if "lab1" in x.text())
     assert online.isEnabled()
     assert "●" not in online.text()
 
@@ -121,7 +123,9 @@ def test_launcher_open_url_used():
     mgr = TrayManager(tray_icon)
     c = ClusterConfig(id="c1", name="lab1", host="10.0.0.5", port=8006, token_id="root@pam!t")
     mgr.set_clusters([c])
-    mgr.update_from_health([ClusterHealth(cluster_id="c1", cluster_name="lab1", online=True, vms=[], containers=[])])
+    mgr.update_from_health(
+        [ClusterHealth(cluster_id="c1", cluster_name="lab1", online=True, vms=[], containers=[])]
+    )
     app.processEvents()
     actions = [a for a in mgr._open_menu.actions() if "lab1" in a.text()]
     assert actions
@@ -162,4 +166,6 @@ def test_activated_handling_all_reasons():
 def test_app_applies_theme_rebuilds_icons():
     text = pathlib.Path("src/proxmox_widget/app.py").read_text(encoding="utf-8")
     assert "rebuild_icons" in text
-    assert "palette_for" in pathlib.Path("src/proxmox_widget/ui/tray.py").read_text(encoding="utf-8")
+    assert "palette_for" in pathlib.Path("src/proxmox_widget/ui/tray.py").read_text(
+        encoding="utf-8"
+    )

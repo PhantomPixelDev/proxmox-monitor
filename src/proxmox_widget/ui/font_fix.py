@@ -24,12 +24,14 @@ Fix:
   otherwise C++ style polish will warn even with Python clamp.
 - Provide safe_font() helper to copy app font when available
 """
+
 from __future__ import annotations
 
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 _orig_setPointSize = QFont.setPointSize
+
 
 def _clamped_setPointSize(self: QFont, size: int) -> None:
     try:
@@ -39,6 +41,7 @@ def _clamped_setPointSize(self: QFont, size: int) -> None:
         size = 1
     return _orig_setPointSize(self, int(size))
 
+
 # patch once at import
 try:
     QFont.setPointSize = _clamped_setPointSize  # type: ignore[method-assign,assignment]
@@ -47,6 +50,7 @@ except Exception:
 
 _orig_setPixelSize = QFont.setPixelSize
 
+
 def _clamped_setPixelSize(self: QFont, size: int) -> None:
     try:
         if size is not None and int(size) <= 0:
@@ -54,6 +58,7 @@ def _clamped_setPixelSize(self: QFont, size: int) -> None:
     except Exception:
         size = 1
     return _orig_setPixelSize(self, int(size))
+
 
 try:
     QFont.setPixelSize = _clamped_setPixelSize  # type: ignore[method-assign,assignment]

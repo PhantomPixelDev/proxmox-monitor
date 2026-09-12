@@ -30,7 +30,13 @@ async def test_first_connect_stores(tmp_path, monkeypatch):
     fp1 = _fp("cert1")
     monkeypatch.setattr(client_mod, "_fetch_fingerprint", lambda h, p: fp1)
     c = ClusterConfig(
-        id="pve-tofu", name="PVE", host="127.0.0.1", port=8006, verify_ssl=False, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-tofu",
+        name="PVE",
+        host="127.0.0.1",
+        port=8006,
+        verify_ssl=False,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl = ProxmoxClient(c, secret="s")
     await cl._ensure_tofu()
@@ -43,7 +49,12 @@ async def test_second_same_passes(tmp_path, monkeypatch):
     fp1 = _fp("cert1")
     monkeypatch.setattr(client_mod, "_fetch_fingerprint", lambda h, p: fp1)
     c = ClusterConfig(
-        id="pve-tofu2", name="PVE", host="127.0.0.1", verify_ssl=False, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-tofu2",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=False,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl = ProxmoxClient(c, secret="s")
     await cl._ensure_tofu()
@@ -58,7 +69,12 @@ async def test_changed_raises(tmp_path, monkeypatch):
     fp2 = _fp("cert2")
     monkeypatch.setattr(client_mod, "_fetch_fingerprint", lambda h, p: fp1)
     c = ClusterConfig(
-        id="pve-mismatch", name="PVE", host="127.0.0.1", verify_ssl=False, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-mismatch",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=False,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl = ProxmoxClient(c, secret="s")
     await cl._ensure_tofu()
@@ -77,12 +93,22 @@ async def test_public_pki_bypasses_pin(tmp_path, monkeypatch):
 
     monkeypatch.setattr(client_mod, "_fetch_fingerprint", _fail)
     c = ClusterConfig(
-        id="pve-public", name="PVE", host="127.0.0.1", verify_ssl=True, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-public",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=True,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl = ProxmoxClient(c, secret="s")
     await cl._ensure_tofu()
     assert "hit" not in called
-    assert not (tmp_path / "trust.json").exists() or "pve-public" not in json.loads((tmp_path / "trust.json").read_text(encoding="utf-8")) if (tmp_path / "trust.json").exists() else True
+    assert (
+        not (tmp_path / "trust.json").exists()
+        or "pve-public" not in json.loads((tmp_path / "trust.json").read_text(encoding="utf-8"))
+        if (tmp_path / "trust.json").exists()
+        else True
+    )
 
 
 @pytest.mark.asyncio
@@ -92,7 +118,13 @@ async def test_ca_bundle_pins_and_verify_wins(tmp_path, monkeypatch):
     fp1 = _fp("ca-cert")
     monkeypatch.setattr(client_mod, "_fetch_fingerprint", lambda h, p: fp1)
     c = ClusterConfig(
-        id="pve-ca", name="PVE", host="127.0.0.1", verify_ssl=True, ca_bundle=str(ca), auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-ca",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=True,
+        ca_bundle=str(ca),
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl = ProxmoxClient(c, secret="s")
     assert cl._verify() == str(ca)
@@ -101,13 +133,23 @@ async def test_ca_bundle_pins_and_verify_wins(tmp_path, monkeypatch):
     data = json.loads((tmp_path / "trust.json").read_text(encoding="utf-8"))
     assert data["pve-ca"] == fp1
     c2 = ClusterConfig(
-        id="pve-verify-true", name="PVE", host="127.0.0.1", verify_ssl=True, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-verify-true",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=True,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl2 = ProxmoxClient(c2, secret="s")
     assert cl2._verify() is True
     assert cl2._needs_tofu() is False
     c3 = ClusterConfig(
-        id="pve-verify-false", name="PVE", host="127.0.0.1", verify_ssl=False, auth_mode=AuthMode.TOKEN, token_id="root@pam!t"
+        id="pve-verify-false",
+        name="PVE",
+        host="127.0.0.1",
+        verify_ssl=False,
+        auth_mode=AuthMode.TOKEN,
+        token_id="root@pam!t",
     )
     cl3 = ProxmoxClient(c3, secret="s")
     assert cl3._verify() is False
