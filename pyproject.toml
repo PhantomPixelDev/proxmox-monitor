@@ -31,7 +31,7 @@ dependencies = [
   "keyring>=25.0",
   "psutil>=6.0",
   "loguru>=0.7",
-  "filelock==3.13",
+  "filelock==4.0.0",
 ]
 
 [project.optional-dependencies]
